@@ -1,0 +1,18 @@
+spring.application.name=openStudy
+
+# PostgreSQL database
+spring.datasource.url=jdbc:postgresql://localhost:5432/postgres
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.datasource.username=postgres
+spring.datasource.password=postgres
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=update
+
+# Bootstrap admin account (change these values in production)
+app.admin.enabled=true
+app.admin.name=System Admin
+app.admin.email=admin@openstudy.local
+app.admin.password=change_me_in_production
+
+# JWT secret (use a strong random value in production)
+jwt.secret=change_me_to_a_random_strong_secret_in_production
