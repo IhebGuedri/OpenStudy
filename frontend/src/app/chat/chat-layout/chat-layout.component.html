@@ -1,0 +1,55 @@
+<div class="app-container">
+
+  <!-- LEFT SIDEBAR -->
+  <app-chat-sidebar
+    *ngIf="isSidebarOpen"
+    [listeCours]="conversations"
+    [activeIndex]="activeConversationIndex"
+    [isLoading]="isCoursesLoading"
+    (selectCours)="onSelectConversation($event)"
+    (newConversation)="onNewConversation()"
+    (deleteCourse)="onDeleteCourse($event)">
+  </app-chat-sidebar>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <!-- Toolbar -->
+    <div class="chat-toolbar">
+      <button mat-icon-button (click)="isSidebarOpen = !isSidebarOpen" matTooltip="Toggle sidebar">
+        <mat-icon>menu</mat-icon>
+      </button>
+      <div class="left-toolbar-actions">
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          (click)="saveCourseForReading()"
+          [disabled]="!activeCoursId || !isCurrentCourseEditMode">
+          Sauvegarder
+        </button>
+        <button
+          mat-stroked-button
+          color="primary"
+          type="button"
+          (click)="enableCourseEditing()"
+          [disabled]="!activeCoursId || isCurrentCourseEditMode">
+          Modifier
+        </button>
+      </div>
+      
+    </div>
+
+    <!-- Course chapters and notebook-like cells -->
+    <app-chat-area
+      [chapitres]="chapitresActifs"
+      [isChapitresLoading]="isChapitresLoading"
+      [activeCoursTitre]="activeCourseTitle"
+      [activeCoursId]="activeCoursId"
+      [isEditMode]="isCurrentCourseEditMode"
+      (courseTitleUpdated)="onCourseTitleUpdated($event)">
+    </app-chat-area>
+
+  </div>
+</div>
+

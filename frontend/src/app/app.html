@@ -1,0 +1,35 @@
+<header class="top-nav" *ngIf="showNavbar">
+	<a class="brand" routerLink="/mes-cours">OpenStudy</a>
+
+	<nav class="nav-links" aria-label="Navigation principale">
+		<a routerLink="/mes-cours" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Mes cours</a>
+		<a routerLink="/public-courses" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }">Cours publics</a>
+
+		<ng-container *ngIf="!isAuthenticated; else profileArea">
+			<a routerLink="/login" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Connexion</a>
+			<a routerLink="/register" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Inscription</a>
+		</ng-container>
+
+		<ng-template #profileArea>
+			<button class="profile-menu-trigger" mat-stroked-button [matMenuTriggerFor]="profileMenu" type="button">
+				<mat-icon>account_circle</mat-icon>
+				<span>Menu Profil</span>
+			</button>
+
+			<mat-menu #profileMenu="matMenu" class="profile-menu-panel">
+				<div class="profile-menu-header">
+					<div class="profile-name">{{ profileLabel }}</div>
+					<div class="profile-email" *ngIf="profileEmail">{{ profileEmail }}</div>
+				</div>
+				<button mat-menu-item type="button" (click)="logout()">
+					<mat-icon>logout</mat-icon>
+					<span>Déconnexion</span>
+				</button>
+			</mat-menu>
+		</ng-template>
+	</nav>
+</header>
+
+<main class="page-content">
+	<router-outlet></router-outlet>
+</main>

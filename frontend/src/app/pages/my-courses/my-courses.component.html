@@ -1,0 +1,52 @@
+<div class="my-courses-container">
+  <div *ngIf="isLoading" class="loading">
+    <p>Chargement de vos cours...</p>
+  </div>
+
+  <div *ngIf="!isLoading" class="list-view">
+    <div class="header">
+      <div class="header-top">
+        <h1>Mes Cours</h1>
+        <button class="create-course-btn" type="button" (click)="createNewCourse()" [disabled]="isCreating">
+          {{ isCreating ? 'Création...' : '+ Nouveau cours' }}
+        </button>
+      </div>
+      <div class="search-bar">
+        <input
+          type="text"
+          placeholder="Rechercher dans mes cours..."
+          [(ngModel)]="searchQuery"
+          class="search-input"
+        />
+      </div>
+    </div>
+
+    <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
+
+    <div *ngIf="filteredCourses.length === 0 && !errorMessage" class="no-courses">
+      <p>Aucun cours disponible</p>
+    </div>
+
+    <div class="courses-grid">
+      <div *ngFor="let course of filteredCourses" class="course-card" (click)="openCourse(course.id)">
+        <div class="course-cover">
+          <span class="cover-label">Mes cours</span>
+        </div>
+        <div class="course-content">
+          <h3 class="course-title">{{ course.titre }}</h3>
+          <p class="chapters-count">{{ course.chaptersCount }} chapitre{{ course.chaptersCount > 1 ? 's' : '' }}</p>
+        </div>
+        <div class="course-footer">
+          <button class="open-btn" type="button">Ouvrir dans chat</button>
+          <button
+            class="delete-btn"
+            type="button"
+            (click)="deleteCourse(course.id, $event)"
+            [disabled]="deletingCourseId === course.id">
+            {{ deletingCourseId === course.id ? 'Suppression...' : 'Supprimer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

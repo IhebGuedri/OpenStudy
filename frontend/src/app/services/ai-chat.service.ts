@@ -1,0 +1,168 @@
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, Subject, BehaviorSubject } from 'rxjs';
+import { tap, catchError, map } from 'rxjs/operators';
+import { of } from 'rxjs';
+
+export interface AIMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+export interface ChapterConversationRequest {
+  course_title: string;
+  chapter_title: string;
+  question: string;
+  existing_sections: string[];
+}
+
+export interface ChapterConversationResponse {
+  answer: string;
+  prompt_source: string;
+}
+
+export interface ContentGenerationRequest {
+  topic: string;
+  content_type: string; // TEXTE_GENERE, EXPLICATION_IA, etc.
+  context?: string;
+}
+
+export interface ContentGenerationResponse {
+  generated_content: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AIChatService {
+  private AI_AGENT_BASE_URL = 'http://127.0.0.1:8000/api';
+  private sessionId = this.generateSessionId();
+  private messages$ = new BehaviorSubject<AIMessage[]>([]);
+  private isLoading$ = new BehaviorSubject<boolean>(false);
+
+  constructor(private http: HttpClient) {}
+
+  getMessages$(): Observable<AIMessage[]> {
+    return this.messages$.asObservable();
+  }
+
+  getIsLoading$(): Observable<boolean> {
+    return this.isLoading$.asObservable();
+  }
+
+  /**
+   * Envoyer un message au chat de l'agent IA
+   */
+  sendMessage(
+    userInput: string,
+    chapterTitle: string,
+    courseTitle: string,
+    existingSections: string[]
+  ): Observable<string> {
+    this.isLoading$.next(true);
+
+    // Ajouter le message utilisateur immédiatement
+    const userMessage: AIMessage = {
+      id: this.generateMessageId(),
+      role: 'user',
+      content: userInput,
+      timestamp: new Date()
+    };
+    this.addMessageToChat(userMessage);
+
+    const request: ChapterConversationRequest = {
+      course_title: courseTitle,
+      chapter_title: chapterTitle,
+      question: userInput,
+      existing_sections: existingSections
+    };
+
+    return this.http.post<ChapterConversationResponse>(
+      `${this.AI_AGENT_BASE_URL}/chapter-conversation/reply`,
+      request
+    ).pipe(
+      tap((response: ChapterConversationResponse) => {
+        const assistantMessage: AIMessage = {
+          id: this.generateMessageId(),
+          role: 'assistant',
+          content: response.answer,
+          timestamp: new Date()
+        };
+        this.addMessageToChat(assistantMessage);
+        this.isLoading$.next(false);
+      }),
+      map(() => ''),
+      catchError((error) => {
+        console.error('Error communicating with AI agent:', error);
+        const errorMessage: AIMessage = {
+          id: this.generateMessageId(),
+          role: 'assistant',
+          content: 'Erreur : Impossible de communiquer avec l\'agent IA. Vérifiez que le serveur de l\'agent est démarré.',
+          timestamp: new Date()
+        };
+        this.addMessageToChat(errorMessage);
+        this.isLoading$.next(false);
+        return of('');
+      })
+    );
+  }
+
+  /**
+   * Générer du contenu pour une section specific
+   */
+  generateContent(
+    topic: string,
+    contentType: string,
+    context?: string
+  ): Observable<string> {
+    this.isLoading$.next(true);
+
+    const request: ContentGenerationRequest = {
+      topic,
+      content_type: contentType,
+      context
+    };
+
+    return this.http.post<ContentGenerationResponse>(
+      `${this.AI_AGENT_BASE_URL}/generate-content`,
+      request
+    ).pipe(
+      map((response: ContentGenerationResponse) => response.generated_content),
+      tap(() => {
+        this.isLoading$.next(false);
+      }),
+      catchError((error) => {
+        console.error('Error generating content:', error);
+        this.isLoading$.next(false);
+        return of('Erreur lors de la génération du contenu.');
+      })
+    );
+  }
+
+  /**
+   * Réinitialiser la session (appelé quand on quitte l'édition)
+   */
+  resetSession(): void {
+    this.sessionId = this.generateSessionId();
+    this.messages$.next([]);
+    this.isLoading$.next(false);
+  }
+
+  /**
+   * Ajouter un message au chat
+   */
+  private addMessageToChat(message: AIMessage): void {
+    const currentMessages = this.messages$.value;
+    this.messages$.next([...currentMessages, message]);
+  }
+
+  private generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private generateMessageId(): string {
+    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+}

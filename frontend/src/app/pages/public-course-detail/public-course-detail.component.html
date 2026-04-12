@@ -1,0 +1,132 @@
+<div class="public-course-detail-container">
+  <button class="back-btn" (click)="goBack()">← Retour aux cours publics</button>
+
+  <div *ngIf="isLoading" class="loading">
+    <p>Chargement du cours...</p>
+  </div>
+
+  <p *ngIf="errorMessage && !isLoading" class="error-message">{{ errorMessage }}</p>
+
+  <div *ngIf="course && !isLoading" class="detail-wrapper">
+    <!-- COLONNE GAUCHE: CONTENU PRINCIPAL -->
+    <div class="main-content">
+      <header class="course-header">
+        <h1>{{ (isEditMode ? editableCourse?.titre : course.titre) || 'Sans titre' }}</h1>
+        <p class="owner">Par {{ (course.proprietaire && course.proprietaire.nom) || 'Inconnu' }}</p>
+        <div class="actions-row">
+          <button class="action-btn primary" (click)="copyCourseWithoutChanges()" [disabled]="isSaving">
+            📋 Copier ce cours
+          </button>
+          <button class="action-btn" (click)="startEditing()" [disabled]="isSaving" *ngIf="!isEditMode">
+            ✏️ Modifier puis enregistrer
+          </button>
+          <button class="action-btn danger" (click)="cancelEditing()" [disabled]="isSaving" *ngIf="isEditMode">
+            ❌ Annuler modification
+          </button>
+        </div>
+      </header>
+
+      <section class="chapters-section">
+        <h2>Chapitres</h2>
+        <p *ngIf="!(isEditMode ? editableCourse?.chapitres : course.chapitres) || (isEditMode ? editableCourse?.chapitres : course.chapitres)?.length === 0" class="empty-state">
+          Aucun chapitre disponible pour ce cours.
+        </p>
+
+        <article *ngFor="let chapitre of (isEditMode ? (editableCourse?.chapitres || []) : (course.chapitres || [])); let i = index" class="chapter-card">
+          <h3 *ngIf="!isEditMode">{{ chapitre.titre }}</h3>
+          <input *ngIf="isEditMode" [(ngModel)]="chapitre.titre" class="chapter-input" placeholder="Titre du chapitre" />
+
+          <div class="sections-list" *ngIf="chapitre.sections && chapitre.sections.length > 0; else noSections">
+            <div *ngFor="let section of (chapitre.sections || [])" class="section-card">
+              <p class="section-type" *ngIf="!isEditMode">{{ section.type }}</p>
+              <div *ngIf="isEditMode" class="section-edit-head">
+                <label>Type</label>
+                <select [(ngModel)]="section.type" class="section-select">
+                  <option>TEXTE_GENERE</option>
+                  <option>EXPLICATION_IA</option>
+                  <option>NOTE_PERSONNELLE</option>
+                </select>
+              </div>
+              <div class="section-content markdown-content" *ngIf="!isEditMode || section.type === 'EXPLICATION_IA' || (section.type === 'NOTE_PERSONNELLE' && section.promptSource)" [innerHTML]="renderMarkdown(section.contenu)"></div>
+              <textarea *ngIf="isEditMode && !(section.type === 'EXPLICATION_IA' || (section.type === 'NOTE_PERSONNELLE' && section.promptSource))" [(ngModel)]="section.contenu" rows="4" class="section-textarea" placeholder="Modifiez le contenu de cette section..."></textarea>
+            </div>
+          </div>
+          <ng-template #noSections>
+            <p class="empty-inline">Aucune section dans ce chapitre.</p>
+          </ng-template>
+
+          <div class="chapter-composer" *ngIf="isEditMode">
+            <div class="chapter-actions" style="margin-top: 10px; display: flex; gap: 10px;">
+              <button
+                class="action-btn ghost"
+                (click)="openMarkdownEditor(i)"
+                type="button">
+                + Markdown
+              </button>
+              <button
+                class="action-btn ghost"
+                (click)="openConversationEditor(i)"
+                type="button">
+                + Conversation
+              </button>
+            </div>
+
+            <div class="markdown-editor" *ngIf="chapterComposers[i]?.isMarkdownOpen" style="margin-top: 10px;">
+              <textarea
+                [(ngModel)]="chapterComposers[i].markdownDraft"
+                placeholder="Rédigez votre bloc Markdown..."
+                rows="4"
+                class="section-textarea">
+              </textarea>
+              <div class="editor-actions" style="margin-top: 10px; display: flex; gap: 10px;">
+                <button
+                  class="action-btn primary"
+                  type="button"
+                  (click)="addMarkdownSection(chapitre, i)"
+                  [disabled]="!chapterComposers[i]?.markdownDraft?.trim()">
+                  Ajouter Markdown
+                </button>
+                <button class="action-btn ghost" type="button" (click)="cancelMarkdownEditor(i)">Annuler</button>
+              </div>
+            </div>
+
+            <div class="conversation-editor" *ngIf="chapterComposers[i]?.isConversationOpen" style="margin-top: 10px;">
+              <textarea
+                [(ngModel)]="chapterComposers[i].conversationDraft"
+                placeholder="Écrire la conversation à ajouter dans ce chapitre..."
+                rows="3"
+                class="section-textarea">
+              </textarea>
+              <div class="editor-actions" style="margin-top: 10px; display: flex; gap: 10px;">
+                <button
+                  class="action-btn primary"
+                  type="button"
+                  (click)="addConversationSection(chapitre, i)"
+                  [disabled]="!chapterComposers[i]?.conversationDraft?.trim() || chapterComposers[i]?.isSaving">
+                  {{ chapterComposers[i]?.isSaving ? 'Génération de la réponse...' : 'Ajouter Conversation' }}
+                </button>
+                <button class="action-btn ghost" type="button" (click)="cancelConversationEditor(i)">Annuler</button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <button *ngIf="isEditMode" class="action-btn ghost" (click)="addChapter()">+ Ajouter un chapitre</button>
+      </section>
+    </div>
+  </div>
+
+  <!-- BOUTON SAVE FLOTTANT (VISIBLE EN MODE EDIT SEULEMENT) -->
+  <div class="sticky-save-btn" *ngIf="isEditMode && course">
+    <button 
+      class="save-button" 
+      (click)="saveEditedAsCopy()" 
+      [disabled]="isSaving"
+      [ngClass]="{'saving': isSaving}"
+    >
+      <span *ngIf="!isSaving" class="save-icon">💾</span>
+      <span *ngIf="isSaving" class="save-spinner"></span>
+      <span>{{ isSaving ? 'Sauvegarde...' : 'Enregistrer ma version' }}</span>
+    </button>
+  </div>
+</div>

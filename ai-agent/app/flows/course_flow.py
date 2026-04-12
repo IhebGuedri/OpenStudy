@@ -1,0 +1,187 @@
+from __future__ import annotations
+
+import json
+import os
+from typing import Any, Dict, List, TypedDict
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langgraph.graph import END, StateGraph
+
+from app.models.schemas import NormalizedPlan
+
+
+class PlanGraphState(TypedDict):
+    topic: str
+    description: str
+    feedback: str
+    manual_title: str
+    manual_plan: List[str]
+    title: str
+    chapters: List[str]
+
+
+class ChapterGraphState(TypedDict):
+    course_title: str
+    chapter_title: str
+    chapter_index: int
+    total_chapters: int
+    previous_chapters: List[Dict[str, Any]]
+    content: str
+
+
+def _get_llm() -> ChatGoogleGenerativeAI | None:
+    api_key = os.getenv("GOOGLE_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        temperature=0.4,
+        google_api_key=api_key,
+    )
+
+
+def _fallback_plan(state: PlanGraphState) -> NormalizedPlan:
+    base = state["topic"].strip() or state["description"].strip().split(".")[0]
+    title = state["manual_title"].strip() or f"Parcours complet: {base}"[:100]
+
+    if state["manual_plan"]:
+        return NormalizedPlan(title=title, chapters=state["manual_plan"])
+
+    description = state["description"].replace("\n", " ").strip()
+    fragments = [item.strip() for item in description.split(".") if item.strip()]
+    generated = []
+    for idx, fragment in enumerate(fragments[:6], start=1):
+        generated.append(f"Chapitre {idx}: {fragment[:80]}")
+
+    if not generated:
+        generated = [
+            "Chapitre 1: Introduction",
+            "Chapitre 2: Concepts fondamentaux",
+            "Chapitre 3: Mise en pratique",
+            "Chapitre 4: Cas reels",
+            "Chapitre 5: Synthese et projet final",
+        ]
+
+    return NormalizedPlan(title=title, chapters=generated)
+
+
+def _generate_plan_node(state: PlanGraphState) -> PlanGraphState:
+    llm = _get_llm()
+    if llm is None:
+        plan = _fallback_plan(state)
+        return {**state, "title": plan.title, "chapters": plan.chapters}
+
+    prompt = (
+        "Tu es un expert pedagogique. Cree un plan de cours clair en francais. "
+        "Reponds strictement en JSON avec ce schema: "
+        "{\"title\": string, \"chapters\": string[]}. "
+        "Entre 4 et 8 chapitres.\n"
+        f"Topic: {state['topic']}\n"
+        f"Description: {state['description']}\n"
+        f"Feedback utilisateur: {state['feedback']}\n"
+        f"Titre manuel propose: {state['manual_title']}\n"
+        f"Plan manuel propose: {json.dumps(state['manual_plan'], ensure_ascii=True)}\n"
+    )
+
+    raw = llm.invoke(prompt).content
+    text = raw if isinstance(raw, str) else str(raw)
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1 or end <= start:
+        plan = _fallback_plan(state)
+        return {**state, "title": plan.title, "chapters": plan.chapters}
+
+    try:
+        payload = json.loads(text[start : end + 1])
+        plan = NormalizedPlan.model_validate(payload)
+        return {**state, "title": plan.title, "chapters": plan.chapters}
+    except Exception:
+        plan = _fallback_plan(state)
+        return {**state, "title": plan.title, "chapters": plan.chapters}
+
+
+def _validate_plan_node(state: PlanGraphState) -> PlanGraphState:
+    plan = NormalizedPlan(
+        title=state["title"].strip() or "Nouveau cours",
+        chapters=state["chapters"],
+    )
+    return {**state, "title": plan.title, "chapters": plan.chapters}
+
+
+def _generate_chapter_node(state: ChapterGraphState) -> ChapterGraphState:
+    llm = _get_llm()
+    if llm is None:
+        content = (
+            f"# {state['chapter_title']}\n\n"
+            f"Objectif: Comprendre le chapitre {state['chapter_index'] + 1} sur {state['course_title']}.\n\n"
+            "1. Concept cle\n"
+            "2. Explication detaillee\n"
+            "3. Exemple pratique\n"
+            "4. Mini exercice\n"
+            "5. Resume\n"
+        )
+        return {**state, "content": content}
+
+    prompt = (
+        "Tu rediges un contenu de cours en markdown, pedagogique et progressif, en francais. "
+        "Donne un texte complet pour un seul chapitre avec exemples et mini exercice.\n"
+        f"Cours: {state['course_title']}\n"
+        f"Chapitre ({state['chapter_index'] + 1}/{state['total_chapters']}): {state['chapter_title']}\n"
+        f"Historique des chapitres deja traites: {json.dumps(state['previous_chapters'], ensure_ascii=True)}\n"
+    )
+    raw = llm.invoke(prompt).content
+    text = raw if isinstance(raw, str) else str(raw)
+    return {**state, "content": text.strip()}
+
+
+def generate_conversation_reply(
+    course_title: str,
+    chapter_title: str,
+    question: str,
+    existing_sections: List[str],
+) -> str:
+    llm = _get_llm()
+    if llm is None:
+        return (
+            f"Réponse sur le chapitre '{chapter_title}':\n\n"
+            f"Tu as demandé: {question}\n\n"
+            "Explication:\n"
+            "1. Reformulation du concept\n"
+            "2. Exemple concret\n"
+            "3. Point d'attention\n"
+            "4. Mini exercice\n"
+        )
+
+    prompt = (
+        "Tu es un tuteur pedagogique. Reponds en francais, de maniere claire et concise. "
+        "La reponse doit etre specifique au chapitre courant.\n"
+        f"Cours: {course_title}\n"
+        f"Chapitre actuel: {chapter_title}\n"
+        f"Question etudiant: {question}\n"
+        f"Contenu deja present dans ce chapitre: {json.dumps(existing_sections, ensure_ascii=True)}\n"
+        "Contraintes: reponse utile, structurée, sans sortir du sujet du chapitre."
+    )
+    raw = llm.invoke(prompt).content
+    text = raw if isinstance(raw, str) else str(raw)
+    return text.strip()
+
+
+def build_plan_graph():
+    graph = StateGraph(PlanGraphState)
+    graph.add_node("generate_plan", _generate_plan_node)
+    graph.add_node("validate_plan", _validate_plan_node)
+
+    graph.set_entry_point("generate_plan")
+    graph.add_edge("generate_plan", "validate_plan")
+    graph.add_edge("validate_plan", END)
+    return graph.compile()
+
+
+def build_chapter_graph():
+    graph = StateGraph(ChapterGraphState)
+    graph.add_node("generate_chapter", _generate_chapter_node)
+    graph.set_entry_point("generate_chapter")
+    graph.add_edge("generate_chapter", END)
+    return graph.compile()

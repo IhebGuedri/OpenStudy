@@ -1,0 +1,96 @@
+/* Angular Material Pre-built Theme */
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Montserrat:wght@500;600;700&display=swap');
+
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-soft: #f8faff;
+  --text: #12263a;
+  --text-muted: #567086;
+  --line: #dbe6f2;
+  --primary: #2563ff;
+  --primary-dark: #1c4ee0;
+  --indigo: #4f46e5;
+  --coral: #ff5f64;
+  --success: #11a779;
+  --danger: #d14355;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --shadow-sm: 0 6px 16px rgba(17, 45, 78, 0.08);
+  --shadow-md: 0 14px 34px rgba(17, 45, 78, 0.12);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Manrope', 'Montserrat', sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 255, 0.1), transparent 35%),
+    radial-gradient(circle at 100% 10%, rgba(255, 95, 100, 0.08), transparent 32%),
+    var(--bg);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Montserrat', 'Manrope', sans-serif;
+  letter-spacing: 0.01em;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: var(--primary);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(37, 99, 255, 0.24);
+  outline-offset: 2px;
+}
+
+/* Material icon font */
+.material-icons {
+  font-family: 'Material Icons';
+}
+
+/* Premium defaults for Material buttons */
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button,
+.mat-mdc-outlined-button,
+.mat-mdc-button {
+  border-radius: 12px !important;
+  transition: transform 0.18s ease, box-shadow 0.22s ease, filter 0.22s ease !important;
+}
+
+.mat-mdc-raised-button:hover,
+.mat-mdc-unelevated-button:hover,
+.mat-mdc-outlined-button:hover,
+.mat-mdc-button:hover {
+  transform: translateY(-1px);
+}
+
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button {
+  box-shadow: var(--shadow-sm) !important;
+}

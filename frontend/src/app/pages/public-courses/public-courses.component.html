@@ -1,0 +1,42 @@
+<div class="public-courses-container">
+  <div *ngIf="isLoading" class="loading">
+    <p>Chargement...</p>
+    <p class="loading-hint">Si le chargement dure trop longtemps, rafraichissez la page (Ctrl+F5).</p>
+  </div>
+
+  <div *ngIf="!isLoading" class="list-view">
+    <div class="header">
+      <h1>Cours Publics</h1>
+      <div class="search-bar">
+        <input
+          type="text"
+          placeholder="Rechercher un cours..."
+          [(ngModel)]="searchQuery"
+          class="search-input"
+        />
+      </div>
+    </div>
+
+    <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
+
+    <div *ngIf="filteredCourses.length === 0" class="no-courses">
+      <p>Aucun cours trouvé</p>
+    </div>
+
+    <div class="courses-grid">
+      <div *ngFor="let course of filteredCourses" class="course-card" (click)="openCourse(course.id)">
+        <div class="course-cover">
+          <span class="cover-label">Cours</span>
+        </div>
+        <div class="course-content">
+          <h3 class="course-title">{{ course.titre || 'Sans titre' }}</h3>
+          <p class="author">Par {{ course.ownerName || 'Inconnu' }}</p>
+        </div>
+        <div class="course-footer">
+          <span>Ouvrir</span>
+          <span aria-hidden="true">→</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

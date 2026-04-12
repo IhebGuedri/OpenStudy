@@ -1,0 +1,47 @@
+/*  App Container (exact specs from requirements)  */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #f5f8fd;
+}
+
+/*  Main Content (right side)  */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8fbff;
+  min-width: 0; /* prevents flex children overflowing */
+}
+
+/*  Top Toolbar  */
+.chat-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #dbe6f2;
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  min-height: 56px;
+  flex-shrink: 0;
+}
+
+.left-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-name {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #173656;
+  margin-left: 2px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}

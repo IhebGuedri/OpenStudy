@@ -1,0 +1,54 @@
+<div class="sidebar-header">
+  <div class="brand">
+    <mat-icon class="brand-icon">school</mat-icon>
+    <span class="brand-name">OpenStudy</span>
+  </div>
+  <button mat-icon-button (click)="onNew()" matTooltip="New chat" class="new-chat-btn">
+    <mat-icon>edit_square</mat-icon>
+  </button>
+</div>
+
+<div class="sidebar-label">Mes cours</div>
+
+
+
+<div class="conv-list">
+  <ng-container *ngIf="!isLoading; else loadingCourses">
+    @for (cours of listeCours; track cours.id) {
+      <div class="conv-item-row" [class.active]="$index === activeIndex">
+        <button
+          class="conv-item"
+          [class.active]="$index === activeIndex"
+          (click)="onSelect($index)">
+          <mat-icon class="conv-icon">school</mat-icon>
+          <div class="conv-content">
+            <span class="conv-title">{{ cours.titre }}</span>
+          </div>
+        </button>
+        <button
+          mat-icon-button
+          type="button"
+          class="delete-course-btn"
+          matTooltip="Supprimer ce cours"
+          (click)="onDelete(cours.id, $event)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    }
+  </ng-container>
+  <ng-template #loadingCourses>
+    <div class="loading-courses">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Chargement des cours...</span>
+    </div>
+  </ng-template>
+</div>
+
+<div class="sidebar-footer">
+  <mat-divider></mat-divider>
+  <button mat-button routerLink="/login" class="logout-btn" (click)="onLogout()">
+    <mat-icon>logout</mat-icon>
+    <span>Sign Out</span>
+  </button>
+</div>
+
