@@ -12,7 +12,7 @@ spring.jpa.hibernate.ddl-auto=update
 app.admin.enabled=true
 app.admin.name=System Admin
 app.admin.email=admin@openstudy.local
-app.admin.password=change_me_in_production
+app.admin.password=CHANGE_ME_IN_PRODUCTION
 
-# JWT secret (use a strong random value in production)
-jwt.secret=change_me_to_a_random_strong_secret_in_production
+# JWT secret - CHANGE THIS IN PRODUCTION
+jwt.secret=CHANGE_ME_TO_A_RANDOM_SECURE_VALUE_IN_PRODUCTION
