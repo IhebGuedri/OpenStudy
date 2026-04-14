@@ -4,6 +4,7 @@ import { Chapitre, Cours, SectionContenu } from '../../chat/chat.models';
 import { CourseService } from '../../services/course.service';
 import { AuthService } from '../../services/auth.service';
 import { AIChatService } from '../../services/ai-chat.service';
+import { NotificationService } from '../../services/notification.service';
 import { HttpClient } from '@angular/common/http';
 import { Subject, catchError, finalize, of, takeUntil, timeout, firstValueFrom } from 'rxjs';
 import { marked } from 'marked';
@@ -33,6 +34,7 @@ export class PublicCourseDetailComponent implements OnInit, OnDestroy {
     private courseService: CourseService,
     private authService: AuthService,
     private aiChatService: AIChatService,
+    private notificationService: NotificationService,
     private httpClient: HttpClient,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
@@ -187,6 +189,15 @@ export class PublicCourseDetailComponent implements OnInit, OnDestroy {
       dateAjout: new Date().toISOString(),
       promptSource: ''
     });
+    
+    // Create notification
+    this.notificationService.addNotification({
+      title: 'Contenu ajouté',
+      message: `Section ajoutée au chapitre "${chapter.titre}"`,
+      taskId: `chapter-${index}-${Date.now()}`,
+      icon: 'edit'
+    });
+    
     this.cancelMarkdownEditor(index);
   }
 
@@ -237,6 +248,14 @@ export class PublicCourseDetailComponent implements OnInit, OnDestroy {
           dateAjout: new Date().toISOString(),
           promptSource: reply.prompt_source
         });
+        
+        // Create notification
+        this.notificationService.addNotification({
+          title: 'Réponse reçue',
+          message: `L'IA a répondu à votre question sur "${chapter.titre}"`,
+          taskId: `chapter-${index}-${Date.now()}`,
+          icon: 'smart_toy'
+        });
       }
     ).catch(
       (error) => {
@@ -281,10 +300,17 @@ export class PublicCourseDetailComponent implements OnInit, OnDestroy {
       }))
       .subscribe({
         next: (savedCourse) => {
+          this.notificationService.addNotification({
+            title: 'Copie enregistree',
+            message: `Votre copie "${savedCourse.titre || title}" est disponible.`,
+            taskId: `course-${savedCourse.id}`,
+            courseId: savedCourse.id,
+            icon: 'school'
+          });
           alert(`Copie enregistrée: ${savedCourse.titre || title}`);
           this.isEditMode = false;
           this.aiChatService.resetSession();
-          this.router.navigate(['/chat']);
+          this.router.navigate(['/chat'], { queryParams: { courseId: savedCourse.id } });
         },
         error: (error) => {
           console.error('Error saving copied course:', error);

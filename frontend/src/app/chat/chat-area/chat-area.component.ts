@@ -13,6 +13,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ChapitreSummary, SectionContenuSummary } from '../chat.models';
 import { marked } from 'marked';
+import { NotificationService } from '../../services/notification.service';
 
 type SectionType = SectionContenuSummary['type'];
 
@@ -110,8 +111,13 @@ export class ChatAreaComponent implements OnChanges {
   private readonly composerByCourse = new Map<number, Record<number, ChapterComposerState>>();
   private readonly planByCourse = new Map<number, CoursePlanState>();
   private readonly aiAgentBaseUrl = 'http://127.0.0.1:8000';
+  private readonly planStorageKey = 'openstudy.coursePlans';
 
-  constructor(private http: HttpClient, private cdr: ChangeDetectorRef) {
+  constructor(
+    private http: HttpClient,
+    private cdr: ChangeDetectorRef,
+    private notificationService: NotificationService
+  ) {
     // Note: AuthService should be injected to get current user ID if needed
   }
 
@@ -138,6 +144,55 @@ export class ChatAreaComponent implements OnChanges {
     try {
       this.cdr.detectChanges();
     } catch (_) {}
+  }
+
+  private persistActivePlanState(): void {
+    if (!this.activeCoursId || this.activeCoursId <= 0 || !this.currentPlanState) {
+      return;
+    }
+
+    try {
+      const raw = localStorage.getItem(this.planStorageKey);
+      const store = raw ? JSON.parse(raw) as Record<string, CoursePlanState> : {};
+      store[String(this.activeCoursId)] = this.normalizePlanState(this.currentPlanState);
+      localStorage.setItem(this.planStorageKey, JSON.stringify(store));
+    } catch (error) {
+      console.warn('Impossible de persister le plan du cours:', error);
+    }
+  }
+
+  private getPersistedPlanState(courseId: number): CoursePlanState | null {
+    try {
+      const raw = localStorage.getItem(this.planStorageKey);
+      if (!raw) {
+        return null;
+      }
+
+      const store = JSON.parse(raw) as Record<string, CoursePlanState>;
+      const value = store[String(courseId)];
+      return value ? this.normalizePlanState(value) : null;
+    } catch (error) {
+      console.warn('Impossible de restaurer le plan du cours:', error);
+      return null;
+    }
+  }
+
+  private normalizePlanState(plan: CoursePlanState): CoursePlanState {
+    const normalizedStep = plan.step === 'creating' ? 'review' : plan.step;
+
+    return {
+      ...plan,
+      step: normalizedStep,
+      isLoading: false,
+    };
+  }
+
+  private buildTaskId(suffix: string): string {
+    if (this.activeCoursId && this.activeCoursId > 0) {
+      return `course-${this.activeCoursId}-${suffix}`;
+    }
+
+    return suffix;
   }
 
   private closeEditingUi(): void {
@@ -285,6 +340,7 @@ export class ChatAreaComponent implements OnChanges {
 
     this.currentPlanState.description = value;
     this.currentPlanState.errorMessage = '';
+    this.persistActivePlanState();
   }
 
   updatePlanTitle(value: string): void {
@@ -293,6 +349,7 @@ export class ChatAreaComponent implements OnChanges {
     }
 
     this.currentPlanState.proposedTitle = value;
+    this.persistActivePlanState();
   }
 
   updatePlanText(value: string): void {
@@ -302,6 +359,7 @@ export class ChatAreaComponent implements OnChanges {
 
     this.currentPlanState.planText = value;
     this.currentPlanState.planChapters = this.parsePlanItems(value);
+    this.persistActivePlanState();
   }
 
   updatePlanChapter(index: number, value: string): void {
@@ -315,6 +373,7 @@ export class ChatAreaComponent implements OnChanges {
 
     this.currentPlanState.planChapters[index] = value;
     this.syncPlanTextFromChapters();
+    this.persistActivePlanState();
   }
 
   addPlanChapter(): void {
@@ -324,6 +383,7 @@ export class ChatAreaComponent implements OnChanges {
 
     this.currentPlanState.planChapters.push('');
     this.syncPlanTextFromChapters();
+    this.persistActivePlanState();
   }
 
   trackByChapterIndex(index: number): number {
@@ -342,6 +402,7 @@ export class ChatAreaComponent implements OnChanges {
 
     this.currentPlanState.planChapters = this.currentPlanState.planChapters.filter((_, i) => i !== index);
     this.syncPlanTextFromChapters();
+    this.persistActivePlanState();
   }
 
   updateReviewFeedback(value: string): void {
@@ -350,6 +411,7 @@ export class ChatAreaComponent implements OnChanges {
     }
 
     this.currentPlanState.reviewFeedback = value;
+    this.persistActivePlanState();
   }
 
   async generatePlanFromDescription(): Promise<void> {
@@ -386,6 +448,16 @@ export class ChatAreaComponent implements OnChanges {
       this.currentPlanState.iteration = response.iteration;
       this.currentPlanState.accepted = response.accepted;
       this.currentPlanState.step = 'review';
+      
+      // Add notification when plan is generated
+      this.notificationService.addNotification({
+        title: 'Plan généré',
+        message: `Un plan de cours "${response.title}" avec ${response.chapters.length} chapitre(s) a été généré`,
+        taskId: this.buildTaskId(`plan-${response.session_id}`),
+        courseId: this.activeCoursId ?? undefined,
+        icon: 'auto_awesome'
+      });
+      this.persistActivePlanState();
     } catch (error) {
       console.error('Erreur generation plan agent:', error);
       this.currentPlanState.errorMessage = 'Impossible de generer le plan maintenant.';
@@ -428,6 +500,16 @@ export class ChatAreaComponent implements OnChanges {
       this.currentPlanState.iteration = response.iteration;
       this.currentPlanState.accepted = response.accepted;
       this.currentPlanState.reviewFeedback = '';
+      
+      // Add notification when plan is revised
+      this.notificationService.addNotification({
+        title: 'Plan révisé',
+        message: `Le plan a été révisé (itération ${response.iteration}) avec ${response.chapters.length} chapitre(s)`,
+        taskId: this.buildTaskId(`plan-revise-${this.currentPlanState.sessionId}`),
+        courseId: this.activeCoursId ?? undefined,
+        icon: 'edit_note'
+      });
+      this.persistActivePlanState();
     } catch (error) {
       console.error('Erreur revision plan agent:', error);
       this.currentPlanState.errorMessage = 'Impossible de reviser le plan pour le moment.';
@@ -517,10 +599,20 @@ export class ChatAreaComponent implements OnChanges {
       this.chapitres = createdChapters;
       this.syncCourseScopedState();
       if (this.currentPlanState) {
+        this.currentPlanState.accepted = true;
         this.currentPlanState.generatedChapters = 0;
       }
       this.currentPlanState.step = 'done';
       this.scrollToBottom();
+
+      this.notificationService.addNotification({
+        title: 'Plan du cours finalise',
+        message: `Le plan est applique avec ${createdChapters.length} chapitre(s) crees.`,
+        taskId: this.buildTaskId(`plan-complete-${this.currentPlanState.sessionId}`),
+        courseId: this.activeCoursId ?? undefined,
+        icon: 'task_alt'
+      });
+      this.persistActivePlanState();
     } catch (error) {
       console.error('Erreur generation plan/chapitres:', error);
       this.currentPlanState.errorMessage = 'Impossible de créer le plan maintenant.';
@@ -590,6 +682,27 @@ export class ChatAreaComponent implements OnChanges {
       this.currentPlanState.generatedChapters = Math.min(this.currentPlanState.generatedChapters + 1, this.chapitres.length);
       this.currentPlanState.step = 'done';
       this.scrollToBottom();
+      
+      // Add notification when chapter content is generated
+      this.notificationService.addNotification({
+        title: 'Chapitre généré',
+        message: `Le contenu du chapitre "${chapter.titre}" a été généré par l'IA`,
+        taskId: this.buildTaskId(`chapter-${chapter.id}`),
+        courseId: this.activeCoursId ?? undefined,
+        icon: 'library_books'
+      });
+
+      if (this.currentPlanState.generatedChapters >= this.chapitres.length) {
+        this.notificationService.addNotification({
+          title: 'Cours cree',
+          message: `Tous les chapitres du cours "${this.activeCoursTitre || 'Nouveau cours'}" sont generes.`,
+          taskId: this.buildTaskId('course-generated-complete'),
+          courseId: this.activeCoursId ?? undefined,
+          icon: 'task_alt'
+        });
+      }
+
+      this.persistActivePlanState();
     } catch (error) {
       console.error('Erreur generation chapitre:', error);
       this.currentPlanState.errorMessage = 'Echec generation du chapitre.';
@@ -793,7 +906,8 @@ export class ChatAreaComponent implements OnChanges {
     }
 
     if (!this.planByCourse.has(this.activeCoursId)) {
-      this.planByCourse.set(this.activeCoursId, {
+      const persisted = this.getPersistedPlanState(this.activeCoursId);
+      this.planByCourse.set(this.activeCoursId, persisted ?? {
         step: 'describe',
         description: '',
         proposedTitle: this.activeCoursTitre || '',
@@ -812,6 +926,7 @@ export class ChatAreaComponent implements OnChanges {
     this.currentPlanState = this.planByCourse.get(this.activeCoursId) ?? null;
 
     if (this.currentPlanState) {
+      this.currentPlanState = this.normalizePlanState(this.currentPlanState);
       if (this.currentPlanState.proposedTitle.trim() === '' && this.activeCoursTitre.trim() !== '') {
         this.currentPlanState.proposedTitle = this.activeCoursTitre;
       }
@@ -821,6 +936,7 @@ export class ChatAreaComponent implements OnChanges {
       }
 
       if (this.chapitres.length > 0) {
+        this.currentPlanState.accepted = true;
         this.currentPlanState.step = 'done';
         this.currentPlanState.generatedChapters = this.chapitres.filter((chapitre) =>
           chapitre.sections.some((section) => section.type === 'TEXTE_GENERE')
@@ -830,6 +946,8 @@ export class ChatAreaComponent implements OnChanges {
       } else if (this.currentPlanState.step === 'done') {
         this.currentPlanState.step = 'review';
       }
+
+      this.persistActivePlanState();
     }
   }
 

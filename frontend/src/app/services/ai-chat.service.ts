@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, Subject, BehaviorSubject } from 'rxjs';
 import { tap, catchError, map } from 'rxjs/operators';
 import { of } from 'rxjs';
+import { NotificationService } from './notification.service';
 
 export interface AIMessage {
   id: string;
@@ -42,7 +43,10 @@ export class AIChatService {
   private messages$ = new BehaviorSubject<AIMessage[]>([]);
   private isLoading$ = new BehaviorSubject<boolean>(false);
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private notificationService: NotificationService
+  ) {}
 
   getMessages$(): Observable<AIMessage[]> {
     return this.messages$.asObservable();
@@ -59,7 +63,8 @@ export class AIChatService {
     userInput: string,
     chapterTitle: string,
     courseTitle: string,
-    existingSections: string[]
+    existingSections: string[],
+    taskId?: string
   ): Observable<string> {
     this.isLoading$.next(true);
 
@@ -79,6 +84,9 @@ export class AIChatService {
       existing_sections: existingSections
     };
 
+    // Generate a taskId if not provided
+    const generatedTaskId = taskId || `task_${Date.now()}`;
+
     return this.http.post<ChapterConversationResponse>(
       `${this.AI_AGENT_BASE_URL}/chapter-conversation/reply`,
       request
@@ -92,6 +100,14 @@ export class AIChatService {
         };
         this.addMessageToChat(assistantMessage);
         this.isLoading$.next(false);
+
+        // Create notification when AI responds
+        this.notificationService.addNotification({
+          title: 'Réponse de l\'IA reçue',
+          message: `Réponse à votre question sur le chapitre "${chapterTitle}"`,
+          taskId: generatedTaskId,
+          icon: 'chat_bubble'
+        });
       }),
       map(() => ''),
       catchError((error) => {
@@ -115,7 +131,8 @@ export class AIChatService {
   generateContent(
     topic: string,
     contentType: string,
-    context?: string
+    context?: string,
+    taskId?: string
   ): Observable<string> {
     this.isLoading$.next(true);
 
@@ -125,13 +142,24 @@ export class AIChatService {
       context
     };
 
+    // Generate a taskId if not provided
+    const generatedTaskId = taskId || `task_${Date.now()}`;
+
     return this.http.post<ContentGenerationResponse>(
       `${this.AI_AGENT_BASE_URL}/generate-content`,
       request
     ).pipe(
       map((response: ContentGenerationResponse) => response.generated_content),
-      tap(() => {
+      tap((generatedContent) => {
         this.isLoading$.next(false);
+
+        // Create notification when content is generated
+        this.notificationService.addNotification({
+          title: 'Tâche générée',
+          message: `Contenu généré pour "${topic}"`,
+          taskId: generatedTaskId,
+          icon: 'check_circle'
+        });
       }),
       catchError((error) => {
         console.error('Error generating content:', error);

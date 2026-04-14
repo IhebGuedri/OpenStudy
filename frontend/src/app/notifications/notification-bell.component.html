@@ -1,0 +1,22 @@
+<div class="notification-bell-container">
+  <button
+    class="bell-button"
+    [class.animate]="bellAnimationState === 'ringing'"
+    (click)="onBellClick()"
+    (keydown)="onBellKeydown($event)"
+    type="button"
+    aria-label="Notifications"
+    [attr.aria-expanded]="showPanel"
+    aria-controls="notification-dropdown">
+    <mat-icon class="bell-icon" [ngClass]="bellAnimationState">notifications</mat-icon>
+    
+    <!-- Badge counter -->
+    <span
+      class="badge"
+      *ngIf="(unreadCount$ | async) as count"
+      [class.visible]="count > 0"
+      [attr.aria-label]="count + ' unread notifications'">
+      {{ count > 99 ? '99+' : count }}
+    </span>
+  </button>
+</div>

@@ -1,0 +1,11 @@
+<div class="notification-center">
+  <app-notification-bell
+    [showPanel]="isPanelOpen"
+    (togglePanel)="onTogglePanel()">
+  </app-notification-bell>
+
+  <app-notification-dropdown
+    [isOpen]="isPanelOpen"
+    (close)="onClosePanel()">
+  </app-notification-dropdown>
+</div>

@@ -1,0 +1,25 @@
+<div class="task-detail-container">
+  <header class="task-header">
+    <h1>Détails de la tâche</h1>
+  </header>
+
+  <div class="task-content" *ngIf="!isLoading">
+    <div class="created-content" [innerHTML]="taskContent"></div>
+
+    <div class="task-actions">
+      <button mat-raised-button color="primary" type="button">
+        <mat-icon>edit</mat-icon>
+        Modifier
+      </button>
+      <button mat-stroked-button type="button">
+        <mat-icon>download</mat-icon>
+        Télécharger
+      </button>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="isLoading">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Chargement de la tâche...</p>
+  </div>
+</div>

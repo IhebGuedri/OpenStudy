@@ -1,11 +1,15 @@
 .my-courses-container {
+  display: flex;
+  flex-direction: column;
   padding: 28px;
   max-width: 1200px;
   margin: 0 auto;
+  height: calc(100vh - 120px);
   background: #f7faff;
   border: 1px solid #dfe8f3;
   border-radius: 24px;
   box-shadow: 0 14px 34px rgba(18, 38, 58, 0.1);
+  overflow: hidden;
 }
 
 .loading {
@@ -18,6 +22,10 @@
 }
 
 .list-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   animation: fadeIn 0.25s ease-in;
 }
 
@@ -96,9 +104,24 @@
 }
 
 .courses-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  padding-bottom: 14px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 22px;
+  align-content: start;
+}
+
+.courses-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.courses-grid::-webkit-scrollbar-thumb {
+  background: #c9d8ea;
+  border-radius: 999px;
 }
 
 .course-card {
@@ -111,6 +134,7 @@
   flex-direction: column;
   overflow: hidden;
   cursor: pointer;
+  min-height: 330px;
 }
 
 .course-card:hover {
@@ -142,6 +166,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-height: 0;
 }
 
 .course-title {
@@ -149,6 +175,11 @@
   color: #1a3047;
   font-size: 19px;
   line-height: 1.35;
+  overflow: hidden;
+  display: -webkit-box;
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .chapters-count {
@@ -210,10 +241,13 @@
   .my-courses-container {
     padding: 16px;
     border-radius: 16px;
+    height: auto;
+    min-height: calc(100vh - 110px);
   }
 
   .courses-grid {
     grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .header h1 {

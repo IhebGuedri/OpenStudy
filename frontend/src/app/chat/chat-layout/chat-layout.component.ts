@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, finalize, forkJoin, map, Observable, of, switchMap } from 'rxjs';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-chat-layout',
@@ -27,7 +28,8 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private authService: AuthService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private notificationService: NotificationService
   ) {}
 
   get activeCourseTitle(): string {
@@ -59,7 +61,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.cleanupPendingEmptyCourses().subscribe();
+    // Keep empty/in-progress courses so background generation results can be reopened later.
   }
 
   fetchCourses(): void {
@@ -75,20 +77,12 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
           const requestedCourseId = Number(this.route.snapshot.queryParamMap.get('courseId'));
           const keepRequestedCourse = Number.isFinite(requestedCourseId) && requestedCourseId > 0;
 
-          const emptyCourseIds = allCourses
-            .filter((course) => this.isCourseEmpty(course) && (!keepRequestedCourse || course.id !== requestedCourseId))
-            .map((course) => course.id)
-            .filter((id) => typeof id === 'number' && id > 0);
-
           this.conversations = allCourses
-            .filter((course) => !this.isCourseEmpty(course) || (keepRequestedCourse && course.id === requestedCourseId))
             .map((course) => ({
               id: course.id,
               titre: course.titre ?? '',
             }))
             .filter((cours) => cours.titre.trim() !== '');
-
-          this.deleteCoursesByIds(emptyCourseIds).subscribe();
           this.finalizeCoursesLoad();
         },
         error: (error) => {
@@ -268,7 +262,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
     );
   }
 
-  private loadChapitresForActiveCourse(): void {
+  private loadChapitresForActiveCourse(retriesLeft: number = 2): void {
     const activeCourse = this.conversations[this.activeConversationIndex];
     if (!activeCourse || activeCourse.id <= 0) {
       this.chapitresActifs = [];
@@ -282,7 +276,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
         next: (response) => {
           const mappedChapitres = this.mapChapitres((Array.isArray(response) ? response : []));
           if (mappedChapitres.length === 0) {
-            this.loadChapitresFromCoursEndpoint(activeCourse.id);
+            this.loadChapitresFromCoursEndpoint(activeCourse.id, retriesLeft);
             return;
           }
 
@@ -294,20 +288,33 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
         },
         error: (error) => {
           console.error('Erreur chargement chapitres:', error);
-          this.loadChapitresFromCoursEndpoint(activeCourse.id);
+          this.loadChapitresFromCoursEndpoint(activeCourse.id, retriesLeft);
         }
       });
   }
 
-  private loadChapitresFromCoursEndpoint(coursId: number): void {
+  private loadChapitresFromCoursEndpoint(coursId: number, retriesLeft: number = 2): void {
     if (!this.etudiantId) {
+      this.chapitresActifs = [];
+      this.isChapitresLoading = false;
+      this.cdr.detectChanges();
       return;
     }
 
     this.http.get<Cours>(`http://localhost:8080/cours/${coursId}/etudiant/${this.etudiantId}`)
       .subscribe({
         next: (cours) => {
-          this.chapitresActifs = this.mapChapitres(Array.isArray(cours.chapitres) ? cours.chapitres : []);
+          const mappedChapitres = this.mapChapitres(Array.isArray(cours.chapitres) ? cours.chapitres : []);
+          if (mappedChapitres.length === 0 && retriesLeft > 0) {
+            setTimeout(() => {
+              if (this.activeCoursId === coursId) {
+                this.loadChapitresForActiveCourse(retriesLeft - 1);
+              }
+            }, 700);
+            return;
+          }
+
+          this.chapitresActifs = mappedChapitres;
           this.ensureCourseDisplayMode(coursId, this.chapitresActifs.length);
 
           this.isChapitresLoading = false;
@@ -315,6 +322,15 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
         },
         error: (fallbackError) => {
           console.error('Erreur fallback chapitres:', fallbackError);
+          if (retriesLeft > 0) {
+            setTimeout(() => {
+              if (this.activeCoursId === coursId) {
+                this.loadChapitresForActiveCourse(retriesLeft - 1);
+              }
+            }, 700);
+            return;
+          }
+
           this.chapitresActifs = [];
           this.isChapitresLoading = false;
           this.cdr.detectChanges();

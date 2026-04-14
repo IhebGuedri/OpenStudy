@@ -34,8 +34,7 @@ export class ChatSidebarComponent {
   }
 
   onLogout(): void {
-    this.router.navigate(['/login']).then(() => {
-      this.authService.logout();
-    });
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 }

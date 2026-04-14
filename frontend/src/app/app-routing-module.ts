@@ -6,6 +6,7 @@ import { ChatLayoutComponent } from './chat/chat-layout/chat-layout.component';
 import { PublicCoursesComponent } from './pages/public-courses/public-courses.component';
 import { PublicCourseDetailComponent } from './pages/public-course-detail/public-course-detail.component';
 import { MyCoursesComponent } from './pages/my-courses/my-courses.component';
+import { TaskDetailComponent } from './pages/tasks/task-detail.component';
 
 const routes: Routes = [
   { path: '', redirectTo: 'mes-cours', pathMatch: 'full' },
@@ -15,6 +16,7 @@ const routes: Routes = [
   { path: 'chat', component: ChatLayoutComponent },
   { path: 'public-courses', component: PublicCoursesComponent },
   { path: 'public-courses/:id', component: PublicCourseDetailComponent },
+  { path: 'tasks/:id', component: TaskDetailComponent },
   { path: '**', redirectTo: 'mes-cours' },
 ];
 

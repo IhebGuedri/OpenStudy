@@ -33,6 +33,11 @@ import { PublicCoursesComponent } from './pages/public-courses/public-courses.co
 import { PublicCourseDetailComponent } from './pages/public-course-detail/public-course-detail.component';
 import { AIChatPanelComponent } from './pages/public-course-detail/ai-chat-panel.component';
 import { MyCoursesComponent } from './pages/my-courses/my-courses.component';
+import { NotificationCenterComponent } from './notifications/notification-center.component';
+import { NotificationBellComponent } from './notifications/notification-bell.component';
+import { NotificationDropdownComponent } from './notifications/notification-dropdown.component';
+import { TaskDetailComponent } from './pages/tasks/task-detail.component';
+import { CommonModule } from '@angular/common';
 
 const MATERIAL_MODULES = [
   MatSidenavModule,
@@ -61,10 +66,15 @@ const MATERIAL_MODULES = [
     MyCoursesComponent,
     PublicCoursesComponent,
     PublicCourseDetailComponent,
-    AIChatPanelComponent
+    AIChatPanelComponent,
+    NotificationCenterComponent,
+    NotificationBellComponent,
+    NotificationDropdownComponent,
+    TaskDetailComponent
   ],
   imports: [
     BrowserModule,
+    CommonModule,
     FormsModule,
     ReactiveFormsModule,
     TextFieldModule,

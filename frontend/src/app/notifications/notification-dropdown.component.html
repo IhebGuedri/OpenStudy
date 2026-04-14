@@ -1,0 +1,71 @@
+<div class="notification-dropdown-container" *ngIf="isOpen">
+  <!-- Backdrop -->
+  <div class="dropdown-backdrop" (click)="onBackdropClick()"></div>
+
+  <!-- Dropdown Panel -->
+  <div class="dropdown-panel" id="notification-dropdown" role="region" aria-label="Notifications">
+    <!-- Header -->
+    <div class="dropdown-header">
+      <h2 class="dropdown-title">Notifications</h2>
+      <button
+        class="clear-btn"
+        mat-icon-button
+        (click)="onClearAll()"
+        type="button"
+        title="Supprimer toutes les notifications"
+        aria-label="Clear all notifications">
+        <mat-icon>delete_sweep</mat-icon>
+      </button>
+    </div>
+
+    <!-- Divider -->
+    <mat-divider></mat-divider>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="(notifications$ | async)?.length === 0">
+      <mat-icon class="empty-icon">notifications_none</mat-icon>
+      <p class="empty-text">Aucune notification pour le moment</p>
+    </div>
+
+    <!-- Notifications List -->
+    <div class="notifications-list" *ngIf="(notifications$ | async) as notifications">
+      <div
+        class="notification-item"
+        *ngFor="let notification of notifications"
+        [class.unread]="!notification.read"
+        role="button"
+        tabindex="0"
+        (click)="onNotificationClick(notification)"
+        (keydown.enter)="onNotificationClick(notification)">
+
+        <!-- Notification Icon -->
+        <div class="notification-icon">
+          <mat-icon [class]="notification.icon">{{ notification.icon || 'check_circle' }}</mat-icon>
+        </div>
+
+        <!-- Notification Content -->
+        <div class="notification-content">
+          <div class="notification-header">
+            <h3 class="notification-title">{{ notification.title }}</h3>
+            <span class="notification-time">{{ getTimeAgo(notification.createdAt) }}</span>
+          </div>
+          <p class="notification-message">{{ notification.message }}</p>
+        </div>
+
+        <!-- Delete Button -->
+        <button
+          class="delete-btn"
+          mat-icon-button
+          (click)="onDeleteNotification(notification, $event)"
+          type="button"
+          title="Supprimer"
+          aria-label="Delete notification">
+          <mat-icon>close</mat-icon>
+        </button>
+
+        <!-- Unread Indicator -->
+        <div class="unread-indicator" *ngIf="!notification.read" aria-label="Unread"></div>
+      </div>
+    </div>
+  </div>
+</div>
