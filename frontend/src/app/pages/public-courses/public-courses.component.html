@@ -33,8 +33,23 @@
           <p class="author">Par {{ course.ownerName || 'Inconnu' }}</p>
         </div>
         <div class="course-footer">
-          <span>Ouvrir</span>
-          <span aria-hidden="true">→</span>
+          <button class="open-btn" type="button">Ouvrir</button>
+          <button
+            class="download-btn"
+            type="button"
+            (click)="downloadCoursePdf(course.id, $event)"
+            [disabled]="downloadingCourseId === course.id">
+            {{ downloadingCourseId === course.id ? 'Export PDF...' : 'Télécharger' }}
+          </button>
+          <button
+            class="star-btn"
+            type="button"
+            (click)="toggleStar(course, $event)"
+            [disabled]="isStarring(course.id)"
+            [class.starred]="!!course.starredByMe"
+            [attr.aria-label]="course.starredByMe ? 'Retirer la star' : 'Ajouter une star'">
+            {{ course.starredByMe ? '★ Starred' : '☆ Star' }} ({{ course.starsCount || 0 }})
+          </button>
         </div>
       </div>
     </div>

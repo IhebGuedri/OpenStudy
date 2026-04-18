@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Cours, Courstitre, PublicCourseCard } from '../chat/chat.models';
+import { Cours, Courstitre, PublicCourseCard, MyCourseCard, CourseStarStatus, CourseStarAction } from '../chat/chat.models';
 
 @Injectable({
   providedIn: 'root'
@@ -21,6 +21,11 @@ export class CourseService {
     return this.http.get<PublicCourseCard[]>(`${this.apiUrl}/public/cards`);
   }
 
+  // Get lightweight public course cards with personalized star state
+  getPublicCourseCardsForUser(etudiantId: number): Observable<PublicCourseCard[]> {
+    return this.http.get<PublicCourseCard[]>(`${this.apiUrl}/cards/public/etudiant/${etudiantId}`);
+  }
+
   // Get one public course details
   getPublicCourseById(courseId: number): Observable<Cours> {
     return this.http.get<Cours>(`${this.apiUrl}/public/${courseId}`);
@@ -29,6 +34,11 @@ export class CourseService {
   // Get user's courses
   getUserCourses(etudiantId: number): Observable<Cours[]> {
     return this.http.get<Cours[]>(`${this.apiUrl}/etudiant/${etudiantId}`);
+  }
+
+  // Get user's course cards with star analytics
+  getUserCourseCards(etudiantId: number): Observable<MyCourseCard[]> {
+    return this.http.get<MyCourseCard[]>(`${this.apiUrl}/etudiant/${etudiantId}/cards`);
   }
 
   // Get course titles only
@@ -78,5 +88,20 @@ export class CourseService {
       `${this.apiUrl}/copy/${publicCourseId}/etudiant/${etudiantId}`,
       { titre: newTitle }
     );
+  }
+
+  // Add a star to a course
+  addStar(coursId: number, etudiantId: number): Observable<CourseStarAction> {
+    return this.http.put<CourseStarAction>(`${this.apiUrl}/${coursId}/stars/etudiant/${etudiantId}`, {});
+  }
+
+  // Remove a star from a course
+  removeStar(coursId: number, etudiantId: number): Observable<CourseStarAction> {
+    return this.http.delete<CourseStarAction>(`${this.apiUrl}/${coursId}/stars/etudiant/${etudiantId}`);
+  }
+
+  // Read personalized star status for a course
+  getStarStatus(coursId: number, etudiantId: number): Observable<CourseStarStatus> {
+    return this.http.get<CourseStarStatus>(`${this.apiUrl}/${coursId}/stars/etudiant/${etudiantId}`);
   }
 }

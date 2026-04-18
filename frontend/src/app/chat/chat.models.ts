@@ -13,6 +13,33 @@ export interface PublicCourseCard {
   id: number;
   titre: string;
   ownerName: string;
+  starsCount?: number;
+  starredByMe?: boolean;
+}
+
+export interface MyCourseCard {
+  id: number;
+  titre: string;
+  chaptersCount: number;
+  starsCount: number;
+  starredByMe: boolean;
+  latestStarBy?: string | null;
+  latestStarAtIso?: string | null;
+}
+
+export interface CourseStarStatus {
+  coursId: number;
+  starredByMe: boolean;
+  starsCount: number;
+}
+
+export interface CourseStarAction {
+  starredByMe: boolean;
+  starsCount: number;
+  coursId: number;
+  coursTitre: string;
+  ownerName: string;
+  starrerName: string;
 }
 
 export interface ChapitreSummary {

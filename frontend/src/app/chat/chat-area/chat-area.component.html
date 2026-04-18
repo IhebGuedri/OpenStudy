@@ -9,6 +9,27 @@
           <span class="chapters-count" *ngIf="!isChapitresLoading">
             {{ chapitres.length }} chapitre{{ chapitres.length > 1 ? 's' : '' }}
           </span>
+          <div class="course-actions-right">
+            <button
+              mat-stroked-button
+              color="primary"
+              type="button"
+              class="header-action-btn"
+              (click)="downloadOpenedCoursePdf()"
+              [disabled]="isDownloadingPdf || !activeCoursId">
+              {{ isDownloadingPdf ? 'Export...' : 'Télécharger PDF' }}
+            </button>
+
+            <button
+              mat-stroked-button
+              color="accent"
+              type="button"
+              class="header-action-btn"
+              (click)="toggleCourseStar()"
+              [disabled]="isTogglingStar || !activeCoursId || !currentUserId">
+              {{ starredByMe ? '★ Retirer star' : '☆ Star' }} ({{ starsCount }})
+            </button>
+
           <button
             mat-icon-button
             matTooltip="Rendre le cours {{ courseVisibility === 'PUBLIC' ? 'privé' : 'public' }}"
@@ -20,6 +41,7 @@
             </mat-icon>
             <span class="visibility-label">{{ courseVisibility }}</span>
           </button>
+          </div>
         </div>
       </div>
 

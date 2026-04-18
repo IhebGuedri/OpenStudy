@@ -20,6 +20,12 @@
           <button class="action-btn primary" (click)="generateResumeFromPublicCourse()" [disabled]="isSaving">
             📝 Faire résumé
           </button>
+          <button class="action-btn" (click)="downloadCoursePdf()" [disabled]="isDownloadingPdf || isSaving">
+            {{ isDownloadingPdf ? '⏳ Export PDF...' : '📥 Télécharger PDF' }}
+          </button>
+          <button class="action-btn star" (click)="toggleStar()" [disabled]="isTogglingStar || isSaving">
+            {{ starredByMe ? '★ Retirer star' : '☆ Star' }} ({{ starsCount }})
+          </button>
           <button class="action-btn" (click)="startEditing()" [disabled]="isSaving" *ngIf="!isEditMode">
             ✏️ Modifier puis enregistrer
           </button>

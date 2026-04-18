@@ -63,6 +63,20 @@
   justify-content: space-between;
 }
 
+.course-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.header-action-btn {
+  font-size: 0.76rem;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
 .visibility-toggle-btn {
   display: flex;
   align-items: center;
@@ -113,6 +127,18 @@
 .chapters-count {
   font-size: 0.79rem;
   color: #4f6481;
+}
+
+@media (max-width: 768px) {
+  .course-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .course-actions-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .chapters-loading,

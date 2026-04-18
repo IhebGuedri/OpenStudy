@@ -14,6 +14,8 @@ import { firstValueFrom } from 'rxjs';
 import { ChapitreSummary, SectionContenuSummary } from '../chat.models';
 import { marked } from 'marked';
 import { NotificationService } from '../../services/notification.service';
+import { AuthService } from '../../services/auth.service';
+import jsPDF from 'jspdf';
 
 type SectionType = SectionContenuSummary['type'];
 
@@ -106,6 +108,10 @@ export class ChatAreaComponent implements OnChanges {
   courseVisibility: 'PUBLIC' | 'PRIVE' = 'PRIVE';
   isTogglingVisibility = false;
   currentUserId: number | null = null;
+  starsCount = 0;
+  starredByMe = false;
+  isTogglingStar = false;
+  isDownloadingPdf = false;
   sectionEditors: Record<number, SectionEditorState> = {};
 
   private readonly composerByCourse = new Map<number, Record<number, ChapterComposerState>>();
@@ -116,9 +122,10 @@ export class ChatAreaComponent implements OnChanges {
   constructor(
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private authService: AuthService
   ) {
-    // Note: AuthService should be injected to get current user ID if needed
+    this.currentUserId = this.authService.getUserIdFromToken() ?? this.authService.getCurrentUserId();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -126,6 +133,7 @@ export class ChatAreaComponent implements OnChanges {
       this.syncCourseScopedState();
       if (changes['activeCoursId']) {
         this.loadCourseVisibility();
+        this.loadCourseStarStatus();
       }
     }
 
@@ -999,6 +1007,147 @@ export class ChatAreaComponent implements OnChanges {
           this.courseVisibility = 'PRIVE';
         }
       });
+  }
+
+  loadCourseStarStatus(): void {
+    if (!this.activeCoursId || !this.currentUserId) {
+      this.starsCount = 0;
+      this.starredByMe = false;
+      return;
+    }
+
+    this.http.get<{ coursId: number; starredByMe: boolean; starsCount: number }>(
+      `http://localhost:8080/cours/${this.activeCoursId}/stars/etudiant/${this.currentUserId}`
+    ).subscribe({
+      next: (status) => {
+        this.starredByMe = !!status?.starredByMe;
+        this.starsCount = Number.isFinite(status?.starsCount) ? status.starsCount : 0;
+        this.refreshView();
+      },
+      error: () => {
+        this.starsCount = 0;
+        this.starredByMe = false;
+        this.refreshView();
+      }
+    });
+  }
+
+  toggleCourseStar(): void {
+    if (!this.activeCoursId || !this.currentUserId || this.isTogglingStar) {
+      return;
+    }
+
+    this.isTogglingStar = true;
+    const endpoint = `http://localhost:8080/cours/${this.activeCoursId}/stars/etudiant/${this.currentUserId}`;
+    const request$ = this.starredByMe
+      ? this.http.delete<{ starredByMe: boolean; starsCount: number }>(endpoint)
+      : this.http.put<{ starredByMe: boolean; starsCount: number }>(endpoint, {});
+
+    request$.subscribe({
+      next: (result) => {
+        this.starredByMe = !!result?.starredByMe;
+        this.starsCount = Number.isFinite(result?.starsCount) ? result.starsCount : this.starsCount;
+        this.isTogglingStar = false;
+        this.refreshView();
+      },
+      error: (error) => {
+        console.error('Erreur star/unstar cours ouvert:', error);
+        this.isTogglingStar = false;
+        this.refreshView();
+      }
+    });
+  }
+
+  downloadOpenedCoursePdf(): void {
+    if (this.isDownloadingPdf || !this.activeCoursId) {
+      return;
+    }
+
+    this.isDownloadingPdf = true;
+
+    try {
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const left = 15;
+      const right = pageWidth - 15;
+      const maxWidth = right - left;
+      let y = 18;
+
+      const addPageIfNeeded = (requiredHeight = 8) => {
+        if (y + requiredHeight > pageHeight - 15) {
+          doc.addPage();
+          y = 18;
+        }
+      };
+
+      const addWrappedText = (text: string, fontSize = 11, spacing = 5.2) => {
+        const value = (text || '').trim();
+        if (!value) {
+          return;
+        }
+        doc.setFontSize(fontSize);
+        const lines = doc.splitTextToSize(value, maxWidth);
+        for (const line of lines) {
+          addPageIfNeeded(spacing);
+          doc.text(line, left, y);
+          y += spacing;
+        }
+      };
+
+      doc.setFont('helvetica', 'bold');
+      addWrappedText(this.activeCoursTitre?.trim() || 'Cours sans titre', 18, 7.2);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(90);
+      addPageIfNeeded(6);
+      doc.text(`Export PDF - ${new Date().toLocaleString('fr-FR')}`, left, y);
+      y += 8;
+      doc.setTextColor(0);
+
+      const chapters = Array.isArray(this.chapitres) ? this.chapitres : [];
+      if (chapters.length === 0) {
+        addWrappedText('Ce cours ne contient pas encore de chapitre.', 11, 5.2);
+      } else {
+        chapters.forEach((chapitre, chapterIndex) => {
+          y += 2;
+          doc.setFont('helvetica', 'bold');
+          addWrappedText(`Chapitre ${chapterIndex + 1}: ${chapitre.titre || 'Sans titre'}`, 14, 6.2);
+
+          const sections = Array.isArray(chapitre.sections) ? chapitre.sections : [];
+          if (sections.length === 0) {
+            doc.setFont('helvetica', 'normal');
+            addWrappedText('Aucune section dans ce chapitre.', 10, 4.8);
+            return;
+          }
+
+          sections.forEach((section, sectionIndex) => {
+            y += 1.5;
+            doc.setFont('helvetica', 'bold');
+            addWrappedText(`Section ${sectionIndex + 1} - ${section.type || 'CONTENU'}`, 11, 5);
+
+            doc.setFont('helvetica', 'normal');
+            addWrappedText(section.contenu || '', 10, 4.8);
+          });
+        });
+      }
+
+      const safeTitle = (this.activeCoursTitre || 'cours')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9-_\s]/g, '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .slice(0, 60) || 'cours';
+
+      doc.save(`${safeTitle}.pdf`);
+    } catch (error) {
+      console.error('Erreur export PDF cours ouvert:', error);
+    } finally {
+      this.isDownloadingPdf = false;
+      this.refreshView();
+    }
   }
 
   toggleCourseVisibility(): void {

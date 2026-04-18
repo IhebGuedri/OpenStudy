@@ -3,7 +3,9 @@ package org.example.openstudy.web;
 import org.example.openstudy.Repository.CoursRepo;
 import org.example.openstudy.Repository.EtudiantRepo;
 import org.example.openstudy.Repository.ChapitreRepo;
+import org.example.openstudy.Repository.CoursStarRepo;
 import org.example.openstudy.entities.Cours;
+import org.example.openstudy.entities.CoursStar;
 import org.example.openstudy.entities.Chapitre;
 import org.example.openstudy.entities.Etudiant;
 import org.example.openstudy.entities.Visibilite;
@@ -14,7 +16,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -25,12 +30,20 @@ public class CoursController {
     private final CoursRepo coursRepo;
     private final EtudiantRepo etudiantRepo;
     private final ChapitreRepo chapitreRepo;
+    private final CoursStarRepo coursStarRepo;
     private final AccessControlService accessControlService;
 
-    public CoursController(CoursRepo coursRepo, EtudiantRepo etudiantRepo, ChapitreRepo chapitreRepo, AccessControlService accessControlService) {
+    public CoursController(
+            CoursRepo coursRepo,
+            EtudiantRepo etudiantRepo,
+            ChapitreRepo chapitreRepo,
+            CoursStarRepo coursStarRepo,
+            AccessControlService accessControlService
+    ) {
         this.coursRepo = coursRepo;
         this.etudiantRepo = etudiantRepo;
         this.chapitreRepo = chapitreRepo;
+        this.coursStarRepo = coursStarRepo;
         this.accessControlService = accessControlService;
     }
 
@@ -120,13 +133,29 @@ public class CoursController {
     public List<PublicCourseCardDto> getPublicCourseCards() {
         return coursRepo.findByVisibilite(Visibilite.PUBLIC)
                 .stream()
-                .map(cours -> new PublicCourseCardDto(
-                        cours.getId(),
-                        cours.getTitre(),
-                        cours.getProprietaire() != null ? cours.getProprietaire().getNom() : "Inconnu"
-                ))
+            .map(cours -> buildPublicCard(cours, null))
                 .toList();
     }
+
+        @GetMapping("/cards/public/etudiant/{etudiantId}")
+        @PreAuthorize("hasAuthority('SCOPE_USER')")
+        public List<PublicCourseCardDto> getPublicCourseCardsForEtudiant(@PathVariable Long etudiantId, Authentication authentication) {
+        accessControlService.requireSelfOrAdmin(etudiantId, authentication);
+        return coursRepo.findByVisibilite(Visibilite.PUBLIC)
+            .stream()
+            .map(cours -> buildPublicCard(cours, etudiantId))
+            .toList();
+        }
+
+        @GetMapping("/etudiant/{etudiantId}/cards")
+        @PreAuthorize("hasAuthority('SCOPE_USER')")
+        public List<MyCourseCardDto> getMesCoursCards(@PathVariable Long etudiantId, Authentication authentication) {
+        accessControlService.requireSelfOrAdmin(etudiantId, authentication);
+        return coursRepo.findByProprietaireId(etudiantId)
+            .stream()
+            .map(cours -> buildMyCard(cours, etudiantId))
+            .toList();
+        }
 
     @GetMapping("/public/{id}")
     public Cours getPublicCourseById(@PathVariable Long id) {
@@ -147,6 +176,64 @@ public class CoursController {
         return coursRepo.save(cours);
     }
 
+        @PutMapping("/{coursId}/stars/etudiant/{etudiantId}")
+        @PreAuthorize("hasAuthority('SCOPE_USER')")
+        public StarActionDto addStar(@PathVariable Long coursId, @PathVariable Long etudiantId, Authentication authentication) {
+        accessControlService.requireSelfOrAdmin(etudiantId, authentication);
+
+        Cours cours = coursRepo.findById(coursId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cours introuvable"));
+        assertCourseCanBeStarredByUser(cours, authentication);
+
+        Etudiant etudiant = etudiantRepo.findById(etudiantId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Étudiant introuvable"));
+
+        if (!coursStarRepo.existsByCoursIdAndEtudiantId(coursId, etudiantId)) {
+            CoursStar star = new CoursStar();
+            star.setCours(cours);
+            star.setEtudiant(etudiant);
+            star.setCreatedAt(LocalDateTime.now());
+            coursStarRepo.save(star);
+        }
+
+        long starsCount = coursStarRepo.countByCoursId(coursId);
+        String ownerName = cours.getProprietaire() != null ? cours.getProprietaire().getNom() : "Inconnu";
+        return new StarActionDto(true, starsCount, cours.getId(), cours.getTitre(), ownerName, etudiant.getNom());
+        }
+
+        @DeleteMapping("/{coursId}/stars/etudiant/{etudiantId}")
+        @PreAuthorize("hasAuthority('SCOPE_USER')")
+        public StarActionDto removeStar(@PathVariable Long coursId, @PathVariable Long etudiantId, Authentication authentication) {
+        accessControlService.requireSelfOrAdmin(etudiantId, authentication);
+
+        Cours cours = coursRepo.findById(coursId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cours introuvable"));
+        assertCourseCanBeStarredByUser(cours, authentication);
+
+        Etudiant etudiant = etudiantRepo.findById(etudiantId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Étudiant introuvable"));
+
+        coursStarRepo.findByCoursIdAndEtudiantId(coursId, etudiantId)
+            .ifPresent(coursStarRepo::delete);
+
+        long starsCount = coursStarRepo.countByCoursId(coursId);
+        String ownerName = cours.getProprietaire() != null ? cours.getProprietaire().getNom() : "Inconnu";
+        return new StarActionDto(false, starsCount, cours.getId(), cours.getTitre(), ownerName, etudiant.getNom());
+        }
+
+        @GetMapping("/{coursId}/stars/etudiant/{etudiantId}")
+        @PreAuthorize("hasAuthority('SCOPE_USER')")
+        public StarStatusDto getStarStatus(@PathVariable Long coursId, @PathVariable Long etudiantId, Authentication authentication) {
+        accessControlService.requireSelfOrAdmin(etudiantId, authentication);
+        Cours cours = coursRepo.findById(coursId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cours introuvable"));
+        assertCourseCanBeStarredByUser(cours, authentication);
+
+        boolean starredByMe = coursStarRepo.existsByCoursIdAndEtudiantId(coursId, etudiantId);
+        long starsCount = coursStarRepo.countByCoursId(coursId);
+        return new StarStatusDto(coursId, starredByMe, starsCount);
+        }
+
     // Get course by ID (for checking visibility - no auth required but limited info)
     @GetMapping("/{id}")
     public CourseVisibilityDto getCourseInfo(@PathVariable Long id) {
@@ -156,7 +243,10 @@ public class CoursController {
     }
 
     public record CourseVisibilityDto(Long id, String titre, String visibilite) {}
-    public record PublicCourseCardDto(Long id, String titre, String ownerName) {}
+    public record PublicCourseCardDto(Long id, String titre, String ownerName, long starsCount, boolean starredByMe) {}
+    public record MyCourseCardDto(Long id, String titre, int chaptersCount, long starsCount, boolean starredByMe, String latestStarBy, String latestStarAtIso) {}
+    public record StarStatusDto(Long coursId, boolean starredByMe, long starsCount) {}
+    public record StarActionDto(boolean starredByMe, long starsCount, Long coursId, String coursTitre, String ownerName, String starrerName) {}
 
     // Copier un cours public comme cours personnel
     @PostMapping("/copy/{publicCourseId}/etudiant/{etudiantId}")
@@ -228,6 +318,43 @@ public class CoursController {
         newSection.setChapitre(targetChapitre);
         
         return newSection;
+    }
+
+    private PublicCourseCardDto buildPublicCard(Cours cours, Long currentEtudiantId) {
+        long starsCount = coursStarRepo.countByCoursId(cours.getId());
+        boolean starredByMe = currentEtudiantId != null
+                && coursStarRepo.existsByCoursIdAndEtudiantId(cours.getId(), currentEtudiantId);
+        String ownerName = cours.getProprietaire() != null ? cours.getProprietaire().getNom() : "Inconnu";
+        return new PublicCourseCardDto(cours.getId(), cours.getTitre(), ownerName, starsCount, starredByMe);
+    }
+
+    private MyCourseCardDto buildMyCard(Cours cours, Long currentEtudiantId) {
+        int chaptersCount = cours.getChapitres() != null ? cours.getChapitres().size() : 0;
+        long starsCount = coursStarRepo.countByCoursId(cours.getId());
+        boolean starredByMe = coursStarRepo.existsByCoursIdAndEtudiantId(cours.getId(), currentEtudiantId);
+        Optional<CoursStar> latestStar = coursStarRepo.findTopByCoursIdOrderByCreatedAtDesc(cours.getId());
+        String latestStarBy = latestStar.map(value -> value.getEtudiant().getNom()).orElse(null);
+        String latestStarAtIso = latestStar
+                .map(value -> value.getCreatedAt().atOffset(ZoneOffset.UTC).toString())
+                .orElse(null);
+
+        return new MyCourseCardDto(
+                cours.getId(),
+                cours.getTitre(),
+                chaptersCount,
+                starsCount,
+                starredByMe,
+                latestStarBy,
+                latestStarAtIso
+        );
+    }
+
+    private void assertCourseCanBeStarredByUser(Cours cours, Authentication authentication) {
+        if (cours.getVisibilite() == Visibilite.PUBLIC) {
+            return;
+        }
+
+        accessControlService.requireCourseOwnerOrAdmin(cours, authentication);
     }
 
     public record CourseCopyDto(String titre) {}

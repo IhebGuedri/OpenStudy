@@ -44,13 +44,6 @@
         <div class="course-footer">
           <button class="open-btn" type="button">Ouvrir dans chat</button>
           <button
-            class="download-btn"
-            type="button"
-            (click)="downloadCoursePdf(course.id, $event)"
-            [disabled]="downloadingCourseId === course.id">
-            {{ downloadingCourseId === course.id ? 'Export PDF...' : 'Télécharger PDF' }}
-          </button>
-          <button
             class="delete-btn"
             type="button"
             (click)="deleteCourse(course.id, $event)"

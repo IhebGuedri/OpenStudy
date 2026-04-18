@@ -35,6 +35,14 @@
   gap: 8px;
 }
 
+.right-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .model-name {
   font-size: 1.02rem;
   font-weight: 700;
@@ -44,4 +52,15 @@
 
 .toolbar-spacer {
   flex: 1;
+}
+
+@media (max-width: 900px) {
+  .chat-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .right-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }

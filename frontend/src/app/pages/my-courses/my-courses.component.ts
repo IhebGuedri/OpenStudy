@@ -1,16 +1,11 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
-import { Cours } from '../../chat/chat.models';
-import { catchError, finalize, of, timeout } from 'rxjs';
+import { Cours, MyCourseCard } from '../../chat/chat.models';
+import { catchError, finalize, forkJoin, of, timeout } from 'rxjs';
 import jsPDF from 'jspdf';
-
-interface MyCourseCard {
-  id: number;
-  titre: string;
-  chaptersCount: number;
-}
+import { CourseService } from '../../services/course.service';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-my-courses',
@@ -27,12 +22,15 @@ export class MyCoursesComponent implements OnInit {
   searchQuery = '';
   myCourses: MyCourseCard[] = [];
   private coursesById = new Map<number, Cours>();
+  private readonly starAlertStoragePrefix = 'openstudy.starAlerts';
+  private loadingStarIds = new Set<number>();
 
   private etudiantId: number | null = null;
 
   constructor(
-    private http: HttpClient,
+    private courseService: CourseService,
     private authService: AuthService,
+    private notificationService: NotificationService,
     private router: Router,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
@@ -56,30 +54,44 @@ export class MyCoursesComponent implements OnInit {
     this.isLoading = true;
     this.errorMessage = '';
 
-    this.http.get<Cours[]>(`http://localhost:8080/cours/etudiant/${this.etudiantId}`)
-      .pipe(
+    forkJoin({
+      courses: this.courseService.getUserCourses(this.etudiantId).pipe(
         timeout(15000),
         catchError((error) => {
-          console.error('Erreur chargement mes cours:', error);
-          this.errorMessage = 'Impossible de charger vos cours pour le moment.';
+          console.error('Erreur chargement contenu cours:', error);
           return of([] as Cours[]);
-        }),
-        finalize(() => {
-          this.isLoading = false;
-          this.cdr.detectChanges();
+        })
+      ),
+      cards: this.courseService.getUserCourseCards(this.etudiantId).pipe(
+        timeout(15000),
+        catchError((error) => {
+          console.error('Erreur chargement cartes cours:', error);
+          this.errorMessage = 'Impossible de charger vos cours pour le moment.';
+          return of([] as MyCourseCard[]);
         })
       )
-      .subscribe((courses) => {
+    })
+      .pipe(finalize(() => {
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      }))
+      .subscribe(({ courses, cards }) => {
         this.ngZone.run(() => {
           const safeCourses = Array.isArray(courses) ? courses : [];
-          this.coursesById = new Map(safeCourses.map((course) => [course.id, course]));
+          const safeCards = Array.isArray(cards) ? cards : [];
 
-          this.myCourses = safeCourses
-            .map((course) => ({
-              id: course.id,
-              titre: (course.titre || '').trim() || 'Sans titre',
-              chaptersCount: Array.isArray(course.chapitres) ? course.chapitres.length : 0,
-            }));
+          this.coursesById = new Map(safeCourses.map((course) => [course.id, course]));
+          this.myCourses = safeCards.map((course) => ({
+            id: course.id,
+            titre: (course.titre || '').trim() || 'Sans titre',
+            chaptersCount: Number.isFinite(course.chaptersCount) ? course.chaptersCount : 0,
+            starsCount: Number.isFinite(course.starsCount) ? course.starsCount : 0,
+            starredByMe: !!course.starredByMe,
+            latestStarBy: course.latestStarBy ?? null,
+            latestStarAtIso: course.latestStarAtIso ?? null,
+          }));
+
+          this.notifyNewStarsIfNeeded(this.myCourses);
           this.cdr.detectChanges();
         });
       });
@@ -110,10 +122,7 @@ export class MyCoursesComponent implements OnInit {
     }
 
     this.isCreating = true;
-    this.http.post<Cours>(`http://localhost:8080/cours/add/${this.etudiantId}`, {
-      titre: 'Nouveau cours',
-      visibilite: 'PRIVE'
-    })
+    this.courseService.createCourse(this.etudiantId, 'Nouveau cours')
       .pipe(finalize(() => {
         this.isCreating = false;
         this.cdr.detectChanges();
@@ -142,7 +151,7 @@ export class MyCoursesComponent implements OnInit {
     }
 
     this.deletingCourseId = courseId;
-    this.http.delete<void>(`http://localhost:8080/cours/delete/${courseId}`)
+    this.courseService.deleteCourse(courseId)
       .pipe(finalize(() => {
         this.deletingCourseId = null;
         this.cdr.detectChanges();
@@ -157,6 +166,40 @@ export class MyCoursesComponent implements OnInit {
           alert('Impossible de supprimer le cours.');
         }
       });
+  }
+
+  isStarring(courseId: number): boolean {
+    return this.loadingStarIds.has(courseId);
+  }
+
+  toggleStar(course: MyCourseCard, event: Event): void {
+    event.stopPropagation();
+
+    if (!this.etudiantId || this.loadingStarIds.has(course.id)) {
+      return;
+    }
+
+    this.loadingStarIds.add(course.id);
+    const action$ = course.starredByMe
+      ? this.courseService.removeStar(course.id, this.etudiantId)
+      : this.courseService.addStar(course.id, this.etudiantId);
+
+    action$.pipe(finalize(() => {
+      this.loadingStarIds.delete(course.id);
+      this.cdr.detectChanges();
+    })).subscribe({
+      next: (result) => {
+        course.starredByMe = result.starredByMe;
+        course.starsCount = result.starsCount;
+        this.persistSeenStarsSnapshot(this.myCourses);
+        this.cdr.detectChanges();
+      },
+      error: (error) => {
+        console.error('Erreur lors du star/unstar:', error);
+        alert('Impossible de mettre à jour la star pour ce cours.');
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   downloadCoursePdf(courseId: number, event?: Event): void {
@@ -270,6 +313,79 @@ export class MyCoursesComponent implements OnInit {
     } finally {
       this.downloadingCourseId = null;
       this.cdr.detectChanges();
+    }
+  }
+
+  private notifyNewStarsIfNeeded(cards: MyCourseCard[]): void {
+    if (!this.etudiantId) {
+      return;
+    }
+
+    const currentName = (this.authService.getUserDisplayName() || '').trim().toLowerCase();
+    const previous = this.readSeenStarsSnapshot();
+
+    for (const card of cards) {
+      const previousCount = previous[String(card.id)] ?? 0;
+      const currentCount = card.starsCount ?? 0;
+      const latestStarBy = (card.latestStarBy || '').trim();
+
+      if (currentCount <= previousCount || !latestStarBy) {
+        continue;
+      }
+
+      if (currentName && latestStarBy.toLowerCase() === currentName) {
+        continue;
+      }
+
+      this.notificationService.addNotification({
+        title: 'Nouvelle star',
+        message: `${latestStarBy} a mis une star sur votre cours "${card.titre}"`,
+        taskId: `course-${card.id}-star-${currentCount}`,
+        courseId: card.id,
+        icon: 'star'
+      });
+    }
+
+    this.persistSeenStarsSnapshot(cards);
+  }
+
+  private readSeenStarsSnapshot(): Record<string, number> {
+    if (!this.etudiantId) {
+      return {};
+    }
+
+    const storageKey = `${this.starAlertStoragePrefix}.${this.etudiantId}`;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        return {};
+      }
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      return Object.fromEntries(
+        Object.entries(parsed)
+          .map(([key, value]) => [key, Number(value)] as const)
+          .filter((entry): entry is readonly [string, number] => Number.isFinite(entry[1]) && entry[1] >= 0)
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  private persistSeenStarsSnapshot(cards: MyCourseCard[]): void {
+    if (!this.etudiantId) {
+      return;
+    }
+
+    const storageKey = `${this.starAlertStoragePrefix}.${this.etudiantId}`;
+    const payload: Record<string, number> = {};
+    for (const card of cards) {
+      payload[String(card.id)] = Math.max(0, Number(card.starsCount || 0));
+    }
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch {
+      // Best effort only.
     }
   }
 }
