@@ -17,6 +17,9 @@
           <button class="action-btn primary" (click)="copyCourseWithoutChanges()" [disabled]="isSaving">
             📋 Copier ce cours
           </button>
+          <button class="action-btn primary" (click)="generateResumeFromPublicCourse()" [disabled]="isSaving">
+            📝 Faire résumé
+          </button>
           <button class="action-btn" (click)="startEditing()" [disabled]="isSaving" *ngIf="!isEditMode">
             ✏️ Modifier puis enregistrer
           </button>

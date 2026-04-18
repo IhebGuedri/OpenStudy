@@ -7,11 +7,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.flows.course_flow import build_chapter_graph, build_plan_graph, generate_conversation_reply
+from app.flows.course_flow import build_chapter_graph, build_plan_graph, generate_conversation_reply, generate_course_summary
 from app.models.schemas import (
     AcceptPlanRequest,
     ChapterConversationRequest,
     ChapterConversationResponse,
+    CourseSummaryRequest,
+    CourseSummaryResponse,
     GenerateNextChapterRequest,
     GenerateNextChapterResponse,
     HealthResponse,
@@ -200,3 +202,14 @@ def chapter_conversation_reply(request: ChapterConversationRequest) -> ChapterCo
     )
     prompt_source = f"course={request.course_title};chapter={request.chapter_title};question={request.question}"
     return ChapterConversationResponse(answer=answer, prompt_source=prompt_source)
+
+
+@app.post("/api/course-summary/generate", response_model=CourseSummaryResponse)
+def course_summary_generate(request: CourseSummaryRequest) -> CourseSummaryResponse:
+    chapters = [chapter.model_dump() for chapter in request.chapters]
+    summary = generate_course_summary(
+        course_title=request.course_title.strip(),
+        chapters=chapters,
+    )
+    prompt_source = f"course={request.course_title};chapters={len(chapters)}"
+    return CourseSummaryResponse(summary=summary, prompt_source=prompt_source)

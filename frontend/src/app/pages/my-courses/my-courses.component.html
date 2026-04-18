@@ -7,9 +7,14 @@
     <div class="header">
       <div class="header-top">
         <h1>Mes Cours</h1>
-        <button class="create-course-btn" type="button" (click)="createNewCourse()" [disabled]="isCreating">
-          {{ isCreating ? 'Création...' : '+ Nouveau cours' }}
-        </button>
+        <div class="header-actions">
+          <button class="secondary-action-btn" type="button" (click)="openResumes()">
+            Mes résumés
+          </button>
+          <button class="create-course-btn" type="button" (click)="createNewCourse()" [disabled]="isCreating">
+            {{ isCreating ? 'Création...' : '+ Nouveau cours' }}
+          </button>
+        </div>
       </div>
       <div class="search-bar">
         <input
@@ -38,6 +43,13 @@
         </div>
         <div class="course-footer">
           <button class="open-btn" type="button">Ouvrir dans chat</button>
+          <button
+            class="download-btn"
+            type="button"
+            (click)="downloadCoursePdf(course.id, $event)"
+            [disabled]="downloadingCourseId === course.id">
+            {{ downloadingCourseId === course.id ? 'Export PDF...' : 'Télécharger PDF' }}
+          </button>
           <button
             class="delete-btn"
             type="button"

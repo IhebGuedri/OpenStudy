@@ -1,0 +1,34 @@
+<div class="resume-detail-container">
+  <button class="back-btn" (click)="goBack()">← Retour à mes résumés</button>
+
+  <div *ngIf="isLoading" class="loading">
+    <p>Chargement du résumé...</p>
+  </div>
+
+  <p *ngIf="errorMessage && !isLoading" class="error-message">{{ errorMessage }}</p>
+
+  <div *ngIf="resume && !isLoading" class="detail-wrapper">
+    <div class="main-content">
+      <header class="resume-header">
+        <p class="eyebrow">Résumé IA</p>
+        <h1>{{ resume.coursTitre || 'Sans titre' }}</h1>
+        <p class="meta">
+          Généré le {{ resume.dateCreation | date:'dd/MM/yyyy à HH:mm' }} par {{ resume.versionIA || 'openStudy-ai-agent' }}
+        </p>
+
+        <div class="actions-row">
+          <button class="action-btn primary" (click)="goToCourse()" [disabled]="!resume.coursId">
+            Aller au cours
+          </button>
+        </div>
+      </header>
+
+      <section class="summary-section">
+        <h2>Contenu du résumé</h2>
+        <article class="summary-card">
+          <div class="summary-content markdown-content" [innerHTML]="renderMarkdown(resume.contenu)"></div>
+        </article>
+      </section>
+    </div>
+  </div>
+</div>

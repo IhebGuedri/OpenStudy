@@ -33,6 +33,8 @@ import { PublicCoursesComponent } from './pages/public-courses/public-courses.co
 import { PublicCourseDetailComponent } from './pages/public-course-detail/public-course-detail.component';
 import { AIChatPanelComponent } from './pages/public-course-detail/ai-chat-panel.component';
 import { MyCoursesComponent } from './pages/my-courses/my-courses.component';
+import { MyResumesComponent } from './pages/my-resumes/my-resumes.component';
+import { ResumeDetailComponent } from './pages/resume-detail/resume-detail.component';
 import { NotificationCenterComponent } from './notifications/notification-center.component';
 import { NotificationBellComponent } from './notifications/notification-bell.component';
 import { NotificationDropdownComponent } from './notifications/notification-dropdown.component';
@@ -64,6 +66,8 @@ const MATERIAL_MODULES = [
     ChatSidebarComponent,
     ChatAreaComponent,
     MyCoursesComponent,
+    MyResumesComponent,
+    ResumeDetailComponent,
     PublicCoursesComponent,
     PublicCourseDetailComponent,
     AIChatPanelComponent,

@@ -1,0 +1,52 @@
+<div class="my-resumes-container">
+  <div *ngIf="isLoading" class="loading">
+    <p>Chargement de vos résumés...</p>
+  </div>
+
+  <div *ngIf="!isLoading" class="list-view">
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <p class="eyebrow">Résumé IA</p>
+          <h1>Mes résumés</h1>
+        </div>
+        <button class="back-btn" type="button" (click)="goToCourses()">
+          Retour aux cours
+        </button>
+      </div>
+
+      <div class="search-bar">
+        <input
+          type="text"
+          placeholder="Rechercher dans mes résumés..."
+          [(ngModel)]="searchQuery"
+          class="search-input"
+        />
+      </div>
+    </div>
+
+    <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
+
+    <div *ngIf="filteredResumes.length === 0 && !errorMessage" class="no-resumes">
+      <p>Aucun résumé disponible</p>
+    </div>
+
+    <div class="resumes-grid">
+      <article *ngFor="let resume of filteredResumes" class="resume-card" (click)="openResume(resume.id)">
+        <div class="resume-cover">
+          <span class="cover-label">Résumé</span>
+        </div>
+
+        <div class="resume-content">
+          <h3 class="resume-title">{{ resume.coursTitre }}</h3>
+          <p class="resume-meta">Généré le {{ resume.dateCreation | date:'dd/MM/yyyy à HH:mm' }}</p>
+          
+        </div>
+
+        <div class="resume-footer">
+          <button class="open-btn" type="button" (click)="openResume(resume.id, $event)">Ouvrir</button>
+        </div>
+      </article>
+    </div>
+  </div>
+</div>

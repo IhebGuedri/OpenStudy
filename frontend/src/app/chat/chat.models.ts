@@ -65,6 +65,8 @@ export interface Resume {
   versionIA: string;
 
   cours?: Cours;
+  coursId?: number;
+  coursTitre?: string;
 }
 
 

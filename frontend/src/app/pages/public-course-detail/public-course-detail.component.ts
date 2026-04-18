@@ -5,6 +5,7 @@ import { CourseService } from '../../services/course.service';
 import { AuthService } from '../../services/auth.service';
 import { AIChatService } from '../../services/ai-chat.service';
 import { NotificationService } from '../../services/notification.service';
+import { ResumeService } from '../../services/resume.service';
 import { HttpClient } from '@angular/common/http';
 import { Subject, catchError, finalize, of, takeUntil, timeout, firstValueFrom } from 'rxjs';
 import { marked } from 'marked';
@@ -35,6 +36,7 @@ export class PublicCourseDetailComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private aiChatService: AIChatService,
     private notificationService: NotificationService,
+    private resumeService: ResumeService,
     private httpClient: HttpClient,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
@@ -128,6 +130,74 @@ export class PublicCourseDetailComponent implements OnInit, OnDestroy {
     }
 
     this.saveCopy(newTitle.trim() || defaultTitle);
+  }
+
+  async generateResumeFromPublicCourse(): Promise<void> {
+    if (!this.ensureLoggedIn() || !this.course || !this.etudiantId) {
+      return;
+    }
+
+    this.isSaving = true;
+    const defaultTitle = `${this.course.titre || 'Cours'} (Copie résumée)`;
+    let copiedCourseId: number | null = null;
+
+    try {
+      const copiedCourse = await firstValueFrom(
+        this.courseService.copyCourseAsPersonal(this.course.id, this.etudiantId, defaultTitle)
+      );
+
+      copiedCourseId = copiedCourse.id;
+
+      const summaryContent = await firstValueFrom(this.aiChatService.generateCourseSummary(copiedCourse));
+      if (!summaryContent.trim()) {
+        throw new Error('Résumé vide');
+      }
+
+      const savedResume = await firstValueFrom(
+        this.resumeService.saveResumeForCourse(copiedCourse.id, {
+          contenu: summaryContent,
+          versionIA: 'openStudy-ai-agent'
+        })
+      );
+
+      this.notificationService.addNotification({
+        title: 'Résumé créé',
+        message: `Le résumé du cours "${copiedCourse.titre || defaultTitle}" est prêt.`,
+        taskId: `resume-${savedResume.id}`,
+        courseId: copiedCourse.id,
+        icon: 'summarize'
+      });
+
+      alert('Résumé généré avec succès.');
+      this.isEditMode = false;
+      this.aiChatService.resetSession();
+      this.router.navigate(['/mes-resumes', savedResume.id]);
+    } catch (error: any) {
+      console.error('Error generating course resume:', error);
+
+      if (error?.status === 401) {
+        alert('Votre session a expire. Veuillez vous reconnecter.');
+        this.authService.logout();
+        this.router.navigate(['/login']);
+        return;
+      }
+
+      if (error?.status === 403) {
+        alert('Acces refuse. Verifiez que vous etes connecte avec le bon compte.');
+        return;
+      }
+
+      if (copiedCourseId) {
+        alert('La copie a ete créée, mais le résumé a échoué.');
+        this.router.navigate(['/chat'], { queryParams: { courseId: copiedCourseId } });
+        return;
+      }
+
+      alert('Erreur lors de la création du résumé.');
+    } finally {
+      this.isSaving = false;
+      this.cdr.detectChanges();
+    }
   }
 
   startEditing(): void {

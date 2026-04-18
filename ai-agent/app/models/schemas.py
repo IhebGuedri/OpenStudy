@@ -34,6 +34,16 @@ class ChapterConversationRequest(BaseModel):
     existing_sections: List[str] = []
 
 
+class CourseSummaryChapter(BaseModel):
+    titre: str
+    sections: List[str] = Field(default_factory=list)
+
+
+class CourseSummaryRequest(BaseModel):
+    course_title: str = Field(min_length=1)
+    chapters: List[CourseSummaryChapter] = Field(default_factory=list)
+
+
 class PlanResponse(BaseModel):
     session_id: str
     title: str
@@ -54,6 +64,11 @@ class GenerateNextChapterResponse(BaseModel):
 
 class ChapterConversationResponse(BaseModel):
     answer: str
+    prompt_source: str
+
+
+class CourseSummaryResponse(BaseModel):
+    summary: str
     prompt_source: str
 
 

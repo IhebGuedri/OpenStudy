@@ -4,6 +4,7 @@ import { Observable, Subject, BehaviorSubject } from 'rxjs';
 import { tap, catchError, map } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { NotificationService } from './notification.service';
+import { Cours } from '../chat/chat.models';
 
 export interface AIMessage {
   id: string;
@@ -32,6 +33,21 @@ export interface ContentGenerationRequest {
 
 export interface ContentGenerationResponse {
   generated_content: string;
+}
+
+export interface CourseSummaryChapterRequest {
+  titre: string;
+  sections: string[];
+}
+
+export interface CourseSummaryRequest {
+  course_title: string;
+  chapters: CourseSummaryChapterRequest[];
+}
+
+export interface CourseSummaryResponse {
+  summary: string;
+  prompt_source: string;
 }
 
 @Injectable({
@@ -165,6 +181,42 @@ export class AIChatService {
         console.error('Error generating content:', error);
         this.isLoading$.next(false);
         return of('Erreur lors de la génération du contenu.');
+      })
+    );
+  }
+
+  generateCourseSummary(course: Cours, taskId?: string): Observable<string> {
+    this.isLoading$.next(true);
+
+    const request: CourseSummaryRequest = {
+      course_title: (course.titre || 'Cours').trim(),
+      chapters: (course.chapitres || []).map((chapter) => ({
+        titre: chapter.titre || 'Chapitre',
+        sections: (chapter.sections || []).map((section) => section.contenu || '')
+      }))
+    };
+
+    const generatedTaskId = taskId || `summary_${Date.now()}`;
+
+    return this.http.post<CourseSummaryResponse>(
+      `${this.AI_AGENT_BASE_URL}/course-summary/generate`,
+      request
+    ).pipe(
+      map((response: CourseSummaryResponse) => response.summary),
+      tap(() => {
+        this.isLoading$.next(false);
+
+        this.notificationService.addNotification({
+          title: 'Résumé généré',
+          message: `Résumé prêt pour "${request.course_title}"`,
+          taskId: generatedTaskId,
+          icon: 'summarize'
+        });
+      }),
+      catchError((error) => {
+        console.error('Error generating course summary:', error);
+        this.isLoading$.next(false);
+        return of('');
       })
     );
   }

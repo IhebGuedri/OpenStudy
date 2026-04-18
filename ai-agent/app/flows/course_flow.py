@@ -29,6 +29,12 @@ class ChapterGraphState(TypedDict):
     content: str
 
 
+class SummaryGraphState(TypedDict):
+    course_title: str
+    chapters: List[Dict[str, Any]]
+    summary: str
+
+
 def _get_llm() -> ChatGoogleGenerativeAI | None:
     api_key = os.getenv("GOOGLE_API_KEY", "").strip()
     if not api_key:
@@ -166,6 +172,62 @@ def generate_conversation_reply(
     raw = llm.invoke(prompt).content
     text = raw if isinstance(raw, str) else str(raw)
     return text.strip()
+
+
+def _fallback_course_summary(state: SummaryGraphState) -> SummaryGraphState:
+    course_title = state["course_title"].strip() or "Cours"
+    chapters = state["chapters"]
+
+    lines = [
+        f"# Résumé de {course_title}",
+        "",
+        "## Idée générale",
+        "Ce cours présente les notions essentielles à retenir et une progression simple chapitre par chapitre.",
+    ]
+
+    if chapters:
+        lines.extend(["", "## Points clés"])
+        for index, chapter in enumerate(chapters[:8], start=1):
+            chapter_title = str(chapter.get("titre", f"Chapitre {index}")).strip() or f"Chapitre {index}"
+            sections = chapter.get("sections") or []
+            section_excerpt = ""
+            if sections:
+                first_section = str(sections[0]).strip()
+                if len(first_section) > 160:
+                    first_section = first_section[:157].rstrip() + "..."
+                section_excerpt = f" - {first_section}"
+            lines.append(f"- {chapter_title}{section_excerpt}")
+    else:
+        lines.extend(["", "## Points clés", "- Aucun chapitre n'a été trouvé dans ce cours."])
+
+    lines.extend([
+        "",
+        "## À retenir",
+        "Relire les titres de chapitres, les sections générées et refaire les exercices ou exemples associés.",
+    ])
+
+    return {**state, "summary": "\n".join(lines).strip()}
+
+
+def generate_course_summary(course_title: str, chapters: List[Dict[str, Any]]) -> str:
+    llm = _get_llm()
+    if llm is None:
+        return _fallback_course_summary({"course_title": course_title, "chapters": chapters, "summary": ""})["summary"]
+
+    prompt = (
+        "Tu es un assistant pedagogique. Redige un résumé simple et utile en francais pour un étudiant. "
+        "Le résumé doit rester court, clair, et structuré en markdown avec les sections: '# Résumé', '## Idée générale', '## Points clés', '## À retenir'. "
+        "N'invente pas de contenu absent des chapitres. Si des sections sont fournies, synthétise-les sans tout recopier.\n"
+        f"Cours: {course_title}\n"
+        f"Chapitres: {json.dumps(chapters, ensure_ascii=True)}\n"
+    )
+
+    raw = llm.invoke(prompt).content
+    text = raw if isinstance(raw, str) else str(raw)
+    cleaned = text.strip()
+    if not cleaned:
+        return _fallback_course_summary({"course_title": course_title, "chapters": chapters, "summary": ""})["summary"]
+    return cleaned
 
 
 def build_plan_graph():

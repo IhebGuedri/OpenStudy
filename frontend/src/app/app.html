@@ -3,6 +3,7 @@
 
 	<nav class="nav-links" aria-label="Navigation principale">
 		<a routerLink="/mes-cours" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Mes cours</a>
+		<a routerLink="/mes-resumes" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }">Mes résumés</a>
 		<a routerLink="/public-courses" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }">Cours publics</a>
 
 		<ng-container *ngIf="!isAuthenticated; else profileArea">
