@@ -15,6 +15,7 @@ import { ChapitreSummary, SectionContenuSummary } from '../chat.models';
 import { marked } from 'marked';
 import { NotificationService } from '../../services/notification.service';
 import { AuthService } from '../../services/auth.service';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import jsPDF from 'jspdf';
 
 type SectionType = SectionContenuSummary['type'];
@@ -48,6 +49,8 @@ interface CoursePlanState {
   iteration: number;
   accepted: boolean;
   generatedChapters: number;
+  youtubeVideoUrl: string;
+  youtubeVideoTitle: string;
   isLoading: boolean;
 }
 
@@ -67,6 +70,8 @@ interface GenerateChapterApiResponse {
   chapter_title?: string;
   content?: string;
   prompt_source?: string;
+  youtube_video_url?: string;
+  youtube_video_title?: string;
 }
 
 interface ConversationReplyApiResponse {
@@ -113,17 +118,20 @@ export class ChatAreaComponent implements OnChanges {
   isTogglingStar = false;
   isDownloadingPdf = false;
   sectionEditors: Record<number, SectionEditorState> = {};
+  private isFetchingRecommendedVideo = false;
 
   private readonly composerByCourse = new Map<number, Record<number, ChapterComposerState>>();
   private readonly planByCourse = new Map<number, CoursePlanState>();
   private readonly aiAgentBaseUrl = 'http://127.0.0.1:8000';
   private readonly planStorageKey = 'openstudy.coursePlans';
+  private youtubeEmbedUrl: SafeResourceUrl | null = null;
 
   constructor(
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
     private notificationService: NotificationService,
-    private authService: AuthService
+    private authService: AuthService,
+    private sanitizer: DomSanitizer
   ) {
     this.currentUserId = this.authService.getUserIdFromToken() ?? this.authService.getCurrentUserId();
   }
@@ -131,6 +139,7 @@ export class ChatAreaComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['activeCoursId'] || changes['chapitres']) {
       this.syncCourseScopedState();
+      this.ensureRecommendedVideoForCompletedCourse();
       if (changes['activeCoursId']) {
         this.loadCourseVisibility();
         this.loadCourseStarStatus();
@@ -191,8 +200,50 @@ export class ChatAreaComponent implements OnChanges {
     return {
       ...plan,
       step: normalizedStep,
+      youtubeVideoUrl: plan.youtubeVideoUrl || '',
+      youtubeVideoTitle: plan.youtubeVideoTitle || '',
       isLoading: false,
     };
+  }
+
+  private updateYoutubeEmbedUrl(rawUrl: string): void {
+    const videoId = this.extractYoutubeVideoId(rawUrl);
+    if (!videoId) {
+      this.youtubeEmbedUrl = null;
+      return;
+    }
+
+    this.youtubeEmbedUrl = this.sanitizer.bypassSecurityTrustResourceUrl(
+      `https://www.youtube.com/embed/${videoId}?rel=0`
+    );
+  }
+
+  private extractYoutubeVideoId(url: string): string {
+    const value = (url || '').trim();
+    if (!value) {
+      return '';
+    }
+
+    try {
+      const parsed = new URL(value);
+      const host = parsed.hostname.toLowerCase();
+      if (host.includes('youtu.be')) {
+        return parsed.pathname.replace('/', '').trim();
+      }
+
+      if (host.includes('youtube.com')) {
+        const id = parsed.searchParams.get('v') || '';
+        return id.trim();
+      }
+    } catch (_) {
+      return '';
+    }
+
+    return '';
+  }
+
+  getYoutubeEmbedUrl(): SafeResourceUrl | null {
+    return this.youtubeEmbedUrl;
   }
 
   private buildTaskId(suffix: string): string {
@@ -579,6 +630,9 @@ export class ChatAreaComponent implements OnChanges {
       this.currentPlanState.proposedTitle = acceptedPlan.title;
       this.currentPlanState.planChapters = [...acceptedPlan.chapters];
       this.currentPlanState.planText = acceptedPlan.chapters.join('\n');
+      this.currentPlanState.youtubeVideoUrl = '';
+      this.currentPlanState.youtubeVideoTitle = '';
+      this.youtubeEmbedUrl = null;
 
       await firstValueFrom(this.http.put(`http://localhost:8080/cours/update/${this.activeCoursId}`, { titre: title }));
       this.courseTitleUpdated.emit({ courseId: this.activeCoursId, title });
@@ -632,7 +686,12 @@ export class ChatAreaComponent implements OnChanges {
   }
 
   async generateNextChapterFromAgent(): Promise<void> {
-    if (!this.currentPlanState || !this.currentPlanState.sessionId) {
+    if (!this.currentPlanState) {
+      return;
+    }
+
+    const hasSession = await this.ensureGenerationSession();
+    if (!hasSession || !this.currentPlanState.sessionId) {
       return;
     }
 
@@ -658,7 +717,13 @@ export class ChatAreaComponent implements OnChanges {
 
       if (result.done) {
         this.currentPlanState.generatedChapters = this.chapitres.length;
+        if (result.youtube_video_url) {
+          this.currentPlanState.youtubeVideoUrl = result.youtube_video_url;
+          this.currentPlanState.youtubeVideoTitle = result.youtube_video_title ?? '';
+          this.updateYoutubeEmbedUrl(result.youtube_video_url);
+        }
         this.currentPlanState.step = 'done';
+        this.persistActivePlanState();
         return;
       }
 
@@ -688,6 +753,11 @@ export class ChatAreaComponent implements OnChanges {
       });
 
       this.currentPlanState.generatedChapters = Math.min(this.currentPlanState.generatedChapters + 1, this.chapitres.length);
+      if (result.youtube_video_url) {
+        this.currentPlanState.youtubeVideoUrl = result.youtube_video_url;
+        this.currentPlanState.youtubeVideoTitle = result.youtube_video_title ?? '';
+        this.updateYoutubeEmbedUrl(result.youtube_video_url);
+      }
       this.currentPlanState.step = 'done';
       this.scrollToBottom();
       
@@ -718,6 +788,157 @@ export class ChatAreaComponent implements OnChanges {
     } finally {
       this.currentPlanState.isLoading = false;
       this.refreshView();
+    }
+  }
+
+  private getPlanItemsForGeneration(): string[] {
+    if (this.currentPlanState) {
+      const planItems = this.currentPlanState.planChapters
+        .map((chapter) => chapter.trim())
+        .filter((chapter) => chapter !== '');
+      if (planItems.length > 0) {
+        return planItems;
+      }
+    }
+
+    return this.chapitres
+      .map((chapter) => chapter.titre.trim())
+      .filter((title) => title !== '');
+  }
+
+  private async ensureGenerationSession(): Promise<boolean> {
+    if (!this.currentPlanState) {
+      return false;
+    }
+
+    if (this.currentPlanState.sessionId && this.currentPlanState.accepted) {
+      return true;
+    }
+
+    const planItems = this.getPlanItemsForGeneration();
+    if (planItems.length === 0) {
+      this.currentPlanState.errorMessage = 'Aucun chapitre disponible pour la generation.';
+      return false;
+    }
+
+    const fallbackDescription = this.currentPlanState.description.trim()
+      || `Generer un cours sur ${this.activeCoursTitre || 'ce sujet'} en ${planItems.length} chapitres.`;
+    const finalTitle = this.currentPlanState.proposedTitle.trim() || this.activeCoursTitre.trim() || 'Nouveau cours';
+
+    try {
+      const started = await firstValueFrom(
+        this.http.post<PlanApiResponse>(`${this.aiAgentBaseUrl}/api/course-plan/start`, {
+          description: fallbackDescription,
+          topic: this.activeCoursTitre,
+        })
+      );
+
+      const accepted = await firstValueFrom(
+        this.http.post<PlanApiResponse>(`${this.aiAgentBaseUrl}/api/course-plan/accept`, {
+          session_id: started.session_id,
+          final_title: finalTitle,
+          final_plan: planItems,
+        })
+      );
+
+      this.currentPlanState.sessionId = accepted.session_id;
+      this.currentPlanState.proposedTitle = accepted.title;
+      this.currentPlanState.planChapters = [...accepted.chapters];
+      this.currentPlanState.planText = accepted.chapters.join('\n');
+      this.currentPlanState.iteration = accepted.iteration;
+      this.currentPlanState.accepted = accepted.accepted;
+      this.currentPlanState.errorMessage = '';
+      this.persistActivePlanState();
+      return true;
+    } catch (error) {
+      console.error('Erreur initialisation session agent:', error);
+      this.currentPlanState.errorMessage = 'Impossible d initialiser la session IA pour generer le chapitre.';
+      this.refreshView();
+      return false;
+    }
+  }
+
+  private async ensureRecommendedVideoForCompletedCourse(): Promise<void> {
+    if (this.isFetchingRecommendedVideo) {
+      return;
+    }
+
+    if (!this.currentPlanState || !this.currentPlanState.sessionId || !this.currentPlanState.accepted) {
+      return;
+    }
+
+    if (this.currentPlanState.youtubeVideoUrl.trim()) {
+      return;
+    }
+
+    if (this.chapitres.length === 0 || this.currentPlanState.generatedChapters < this.chapitres.length) {
+      return;
+    }
+
+    this.isFetchingRecommendedVideo = true;
+    try {
+      const result = await firstValueFrom(
+        this.http.post<GenerateChapterApiResponse>(`${this.aiAgentBaseUrl}/api/course-content/generate-next-chapter`, {
+          session_id: this.currentPlanState.sessionId,
+        })
+      );
+
+      const videoUrl = (result.youtube_video_url || '').trim();
+      if (!videoUrl) {
+        return;
+      }
+
+      this.currentPlanState.youtubeVideoUrl = videoUrl;
+      this.currentPlanState.youtubeVideoTitle = result.youtube_video_title ?? '';
+      this.updateYoutubeEmbedUrl(videoUrl);
+
+      const lastChapter = this.chapitres[this.chapitres.length - 1];
+      if (!lastChapter || !lastChapter.id) {
+        this.persistActivePlanState();
+        this.refreshView();
+        return;
+      }
+
+      const alreadyPresent = lastChapter.sections.some((section) => (section.contenu || '').includes(videoUrl));
+      if (alreadyPresent) {
+        this.persistActivePlanState();
+        this.refreshView();
+        return;
+      }
+
+      const sectionContent = `## Video recommandee\n\n[${this.currentPlanState.youtubeVideoTitle || 'Voir la video YouTube'}](${videoUrl})`;
+      const savedSection = await firstValueFrom(
+        this.http.post<SavedSectionResponse>(`http://localhost:8080/sections/add/${lastChapter.id}`, {
+          contenu: sectionContent,
+          type: 'TEXTE_GENERE',
+          promptSource: 'agent-video-recommendation',
+        })
+      );
+
+      const mapped = this.mapSavedSection(
+        savedSection,
+        sectionContent,
+        'TEXTE_GENERE',
+        'agent-video-recommendation'
+      );
+
+      this.chapitres = this.chapitres.map((chapter) => {
+        if (chapter.id !== lastChapter.id) {
+          return chapter;
+        }
+
+        return {
+          ...chapter,
+          sections: [...chapter.sections, mapped],
+        };
+      });
+
+      this.persistActivePlanState();
+      this.refreshView();
+    } catch (error) {
+      console.error('Erreur recuperation video recommandee:', error);
+    } finally {
+      this.isFetchingRecommendedVideo = false;
     }
   }
 
@@ -892,6 +1113,7 @@ export class ChatAreaComponent implements OnChanges {
     if (!this.activeCoursId || this.activeCoursId <= 0) {
       this.chapterComposers = {};
       this.currentPlanState = null;
+      this.youtubeEmbedUrl = null;
       return;
     }
 
@@ -927,6 +1149,8 @@ export class ChatAreaComponent implements OnChanges {
         iteration: 0,
         accepted: false,
         generatedChapters: 0,
+        youtubeVideoUrl: '',
+        youtubeVideoTitle: '',
         isLoading: false,
       });
     }
@@ -956,6 +1180,7 @@ export class ChatAreaComponent implements OnChanges {
       }
 
       this.persistActivePlanState();
+      this.updateYoutubeEmbedUrl(this.currentPlanState.youtubeVideoUrl);
     }
   }
 

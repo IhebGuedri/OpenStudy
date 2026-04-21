@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 import os
 from typing import Any, Dict, List, TypedDict
+from urllib.error import URLError
+from urllib.parse import quote_plus
+from urllib.request import urlopen
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, StateGraph
@@ -247,3 +250,87 @@ def build_chapter_graph():
     graph.set_entry_point("generate_chapter")
     graph.add_edge("generate_chapter", END)
     return graph.compile()
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return 0
+
+
+def build_youtube_search_url(course_title: str, chapters: List[str]) -> str:
+    topic_hint = " ".join([chapter.strip() for chapter in chapters[:4] if chapter and chapter.strip()])
+    query = f"{course_title} {topic_hint}".strip()
+    if not query:
+        query = course_title.strip() or "cours"
+    return f"https://www.youtube.com/results?search_query={quote_plus(query)}"
+
+
+def find_best_youtube_video(course_title: str, chapters: List[str]) -> Dict[str, str]:
+    """Find a relevant and popular YouTube video for the course plan."""
+    api_key = os.getenv("YOUTUBE_API_KEY", "").strip()
+    fallback = {
+        "title": "Rechercher une video YouTube recommandee",
+        "url": build_youtube_search_url(course_title, chapters),
+        "video_id": "",
+    }
+
+    if not api_key:
+        return fallback
+
+    topic_hint = " ".join([chapter.strip() for chapter in chapters[:4] if chapter and chapter.strip()])
+    query = f"{course_title} {topic_hint}".strip()
+    if not query:
+        return fallback
+
+    search_url = (
+        "https://www.googleapis.com/youtube/v3/search"
+        f"?part=snippet&type=video&maxResults=5&order=relevance&q={quote_plus(query)}&key={quote_plus(api_key)}"
+    )
+
+    try:
+        with urlopen(search_url, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, ValueError):
+        return fallback
+
+    items = payload.get("items") or []
+    candidates: List[Dict[str, str]] = []
+    video_ids: List[str] = []
+    for item in items:
+        video_id = str(((item.get("id") or {}).get("videoId") or "")).strip()
+        if not video_id:
+            continue
+
+        title = str(((item.get("snippet") or {}).get("title") or "")).strip()
+        candidates.append({"video_id": video_id, "title": title})
+        video_ids.append(video_id)
+
+    if not candidates:
+        return fallback
+
+    stats_by_id: Dict[str, int] = {}
+    stats_url = (
+        "https://www.googleapis.com/youtube/v3/videos"
+        f"?part=statistics&id={quote_plus(','.join(video_ids))}&key={quote_plus(api_key)}"
+    )
+
+    try:
+        with urlopen(stats_url, timeout=10) as response:
+            stats_payload = json.loads(response.read().decode("utf-8"))
+        for item in stats_payload.get("items") or []:
+            video_id = str(item.get("id") or "").strip()
+            view_count = _safe_int(((item.get("statistics") or {}).get("viewCount")))
+            if video_id:
+                stats_by_id[video_id] = view_count
+    except (URLError, TimeoutError, ValueError):
+        pass
+
+    best = max(candidates, key=lambda item: stats_by_id.get(item["video_id"], 0))
+    video_id = best["video_id"]
+    return {
+        "title": best.get("title", ""),
+        "url": f"https://www.youtube.com/watch?v={video_id}",
+        "video_id": video_id,
+    }

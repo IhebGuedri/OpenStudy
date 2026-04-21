@@ -16,11 +16,11 @@ venv\Scripts\activate
 python -m pip install -r requirements.txt
 ```
 
-3. Configurer la cle Gemini (optionnel si vous acceptez le fallback local):
+3. Configurer les cles API (optionnel si vous acceptez le fallback local):
 
 ```powershell
 copy .env.example .env
-# puis remplir GOOGLE_API_KEY
+# puis remplir GOOGLE_API_KEY et/ou YOUTUBE_API_KEY
 ```
 
 4. Lancer le serveur:
@@ -36,6 +36,8 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `POST /api/course-plan/revise`
 - `POST /api/course-plan/accept`
 - `POST /api/course-content/generate-next-chapter`
+
+Le endpoint de generation de chapitre renvoie aussi `youtube_video_url` et `youtube_video_title` sur le dernier chapitre genere (si `YOUTUBE_API_KEY` est configuree).
 
 ## Notes
 

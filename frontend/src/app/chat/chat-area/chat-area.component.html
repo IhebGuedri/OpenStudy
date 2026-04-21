@@ -203,6 +203,24 @@
           </ng-container>
         </div>
 
+        <section class="recommended-video" *ngIf="currentPlanState?.youtubeVideoUrl">
+          <h4>Video recommandee pour ce cours</h4>
+          <p>
+            <a [href]="currentPlanState?.youtubeVideoUrl" target="_blank" rel="noopener noreferrer">
+              {{ currentPlanState?.youtubeVideoTitle || currentPlanState?.youtubeVideoUrl }}
+            </a>
+          </p>
+          <iframe
+            *ngIf="getYoutubeEmbedUrl()"
+            class="youtube-player"
+            [src]="getYoutubeEmbedUrl()"
+            title="Video YouTube recommandee"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen>
+          </iframe>
+        </section>
+
         <article class="chapter-item" *ngFor="let chapitre of chapitres">
           <div class="chapter-head">
             <span class="chapter-order">Chapitre {{ chapitre.ordre ?? '-' }}</span>

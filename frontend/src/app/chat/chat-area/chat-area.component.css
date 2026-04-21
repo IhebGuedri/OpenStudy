@@ -282,6 +282,32 @@
   gap: 12px;
 }
 
+.recommended-video {
+  background: #fef8ee;
+  border: 1px solid #f3d9a7;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.recommended-video h4 {
+  margin: 0 0 8px;
+  color: #613e06;
+  font-size: 0.95rem;
+}
+
+.recommended-video p {
+  margin: 0 0 10px;
+  font-size: 0.84rem;
+}
+
+.youtube-player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: none;
+  border-radius: 10px;
+  background: #000;
+}
+
 .chapter-item {
   display: flex;
   flex-direction: column;

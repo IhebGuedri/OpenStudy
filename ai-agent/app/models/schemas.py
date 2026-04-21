@@ -60,6 +60,8 @@ class GenerateNextChapterResponse(BaseModel):
     chapter_title: Optional[str] = None
     content: Optional[str] = None
     prompt_source: Optional[str] = None
+    youtube_video_url: Optional[str] = None
+    youtube_video_title: Optional[str] = None
 
 
 class ChapterConversationResponse(BaseModel):

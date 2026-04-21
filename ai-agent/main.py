@@ -7,7 +7,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.flows.course_flow import build_chapter_graph, build_plan_graph, generate_conversation_reply, generate_course_summary
+from app.flows.course_flow import (
+    build_chapter_graph,
+    build_plan_graph,
+    build_youtube_search_url,
+    find_best_youtube_video,
+    generate_conversation_reply,
+    generate_course_summary,
+)
 from app.models.schemas import (
     AcceptPlanRequest,
     ChapterConversationRequest,
@@ -134,6 +141,10 @@ def accept_plan(request: AcceptPlanRequest) -> PlanResponse:
     session["accepted"] = True
     session["chapter_cursor"] = 0
     session["generated_chapters"] = []
+    session["youtube_video"] = find_best_youtube_video(
+        course_title=session["title"],
+        chapters=session["chapters"],
+    )
 
     return PlanResponse(
         session_id=request.session_id,
@@ -155,6 +166,22 @@ def generate_next_chapter(request: GenerateNextChapterRequest) -> GenerateNextCh
 
     chapters: List[str] = session["chapters"]
     cursor: int = int(session.get("chapter_cursor", 0))
+    youtube_video = session.get("youtube_video") or {}
+    if not youtube_video.get("url"):
+        youtube_video = find_best_youtube_video(
+            course_title=session.get("title", ""),
+            chapters=chapters,
+        )
+        if not youtube_video.get("url"):
+            youtube_video = {
+                "title": "Rechercher une video YouTube recommandee",
+                "url": build_youtube_search_url(session.get("title", ""), chapters),
+                "video_id": "",
+            }
+        session["youtube_video"] = youtube_video
+
+    youtube_video_url = youtube_video.get("url")
+    youtube_video_title = youtube_video.get("title")
 
     if cursor >= len(chapters):
         return GenerateNextChapterResponse(
@@ -162,6 +189,8 @@ def generate_next_chapter(request: GenerateNextChapterRequest) -> GenerateNextCh
             done=True,
             chapter_index=cursor,
             total_chapters=len(chapters),
+            youtube_video_url=youtube_video_url,
+            youtube_video_title=youtube_video_title,
         )
 
     chapter_title = chapters[cursor]
@@ -176,6 +205,14 @@ def generate_next_chapter(request: GenerateNextChapterRequest) -> GenerateNextCh
     result = chapter_graph.invoke(state)
 
     content = result["content"]
+    is_last_chapter = cursor == len(chapters) - 1
+    if is_last_chapter and youtube_video_url:
+        content = (
+            f"{content.rstrip()}\n\n"
+            "## Video recommandee\n\n"
+            f"[{youtube_video_title or 'Voir la video YouTube'}]({youtube_video_url})\n"
+        )
+
     prompt_source = f"session={request.session_id};chapter_index={cursor};title={chapter_title}"
 
     session["generated_chapters"].append({"title": chapter_title, "content": content})
@@ -189,6 +226,8 @@ def generate_next_chapter(request: GenerateNextChapterRequest) -> GenerateNextCh
         chapter_title=chapter_title,
         content=content,
         prompt_source=prompt_source,
+        youtube_video_url=youtube_video_url if is_last_chapter else None,
+        youtube_video_title=youtube_video_title if is_last_chapter else None,
     )
 
 
