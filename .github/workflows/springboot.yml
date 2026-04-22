@@ -15,7 +15,7 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: postgres
+          POSTGRES_DB: openstudy          
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
@@ -27,7 +27,7 @@ jobs:
           --health-retries=20
 
     env:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/openstudy 
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
 
