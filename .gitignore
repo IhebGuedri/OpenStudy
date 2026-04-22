@@ -39,7 +39,6 @@ build/
 !.env.sample
 !.env.template
 application.properties
-!application.properties.example
 
 ### Python ###
 venv/
