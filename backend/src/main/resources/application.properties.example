@@ -10,7 +10,7 @@ spring.jpa.hibernate.ddl-auto=update
 
 # Bootstrap admin account (change these values in production)
 app.admin.enabled=true
-app.admin.name=System Admin
+app.admin.name=System Admin1
 app.admin.email=admin@openstudy.local
 app.admin.password=CHANGE_ME_IN_PRODUCTION
 
