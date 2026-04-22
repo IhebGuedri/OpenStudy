@@ -15,21 +15,26 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: openstudy          
+          POSTGRES_DB: openstudy
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres -d postgres"
+          --health-cmd="pg_isready -U postgres -d openstudy"
           --health-interval=5s
           --health-timeout=3s
           --health-retries=20
 
     env:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/openstudy 
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/openstudy
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      APP_ADMIN_EMAIL: ${{ secrets.APP_ADMIN_EMAIL }}
+      APP_ADMIN_PASSWORD: ${{ secrets.APP_ADMIN_PASSWORD }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
 
     steps:
       - name: Checkout
@@ -46,7 +51,7 @@ jobs:
         run: |
           cd backend
           chmod +x mvnw
-          ./mvnw -B test
+          ./mvnw -B -e test
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
