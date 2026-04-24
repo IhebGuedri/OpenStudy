@@ -36,6 +36,7 @@ app = FastAPI(title="openStudy ai-agent", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://openstudy.ihebguedri.tech",
         "http://localhost:4200",
         "http://127.0.0.1:4200",
     ],
