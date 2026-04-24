@@ -11,6 +11,7 @@ import { catchError } from 'rxjs/operators';
 import { throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Router } from '@angular/router';
+import { API_ENDPOINTS } from '../config/api.config';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
@@ -18,7 +19,7 @@ export class AuthInterceptor implements HttpInterceptor {
 
   intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     const token = this.authService.getToken();
-    const isSpringApiCall = req.url.startsWith('http://localhost:8080/');
+    const isSpringApiCall = req.url.startsWith(`${API_ENDPOINTS.springApiBaseUrl}/`);
     const isPublicCourseRequest = this.isPublicCourseRequest(req);
 
     if (!token || !isSpringApiCall || isPublicCourseRequest) {

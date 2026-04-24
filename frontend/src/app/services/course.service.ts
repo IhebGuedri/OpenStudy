@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Cours, Courstitre, PublicCourseCard, MyCourseCard, CourseStarStatus, CourseStarAction } from '../chat/chat.models';
+import { API_ENDPOINTS } from '../config/api.config';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CourseService {
-  private apiUrl = 'http://localhost:8080/cours';
+  private apiUrl = `${API_ENDPOINTS.springApiBaseUrl}/cours`;
 
   constructor(private http: HttpClient) {}
 

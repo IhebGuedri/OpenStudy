@@ -5,6 +5,7 @@ import { AuthService } from '../../services/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, finalize, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { NotificationService } from '../../services/notification.service';
+import { API_ENDPOINTS } from '../../config/api.config';
 
 @Component({
   selector: 'app-chat-layout',
@@ -70,7 +71,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
     }
 
     this.isCoursesLoading = true;
-    this.http.get<Cours[]>(`http://localhost:8080/cours/etudiant/${this.etudiantId}`)
+    this.http.get<Cours[]>(`${API_ENDPOINTS.springApiBaseUrl}/cours/etudiant/${this.etudiantId}`)
       .subscribe({
         next: (coursesResponse) => {
           const allCourses = Array.isArray(coursesResponse) ? coursesResponse : [];
@@ -127,7 +128,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
     }
 
     const body = { titre: 'Nouveau cours', visibilite: 'PRIVE' };
-    this.http.post<Cours>(`http://localhost:8080/cours/add/${this.etudiantId}`, body)
+    this.http.post<Cours>(`${API_ENDPOINTS.springApiBaseUrl}/cours/add/${this.etudiantId}`, body)
       .subscribe({
         next: (newCours) => {
           const titre = newCours.titre && newCours.titre.trim() !== '' ? newCours.titre : 'Nouveau cours';
@@ -181,7 +182,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.http.delete<void>(`http://localhost:8080/cours/delete/${courseId}`)
+    this.http.delete<void>(`${API_ENDPOINTS.springApiBaseUrl}/cours/delete/${courseId}`)
       .subscribe({
         next: () => {
           this.courseEditModeById.delete(courseId);
@@ -271,7 +272,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
     }
 
     this.isChapitresLoading = true;
-    this.http.get<ChapitreSummary[]>(`http://localhost:8080/chapitres/cours/${activeCourse.id}`)
+    this.http.get<ChapitreSummary[]>(`${API_ENDPOINTS.springApiBaseUrl}/chapitres/cours/${activeCourse.id}`)
       .subscribe({
         next: (response) => {
           const mappedChapitres = this.mapChapitres((Array.isArray(response) ? response : []));
@@ -301,7 +302,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.http.get<Cours>(`http://localhost:8080/cours/${coursId}/etudiant/${this.etudiantId}`)
+    this.http.get<Cours>(`${API_ENDPOINTS.springApiBaseUrl}/cours/${coursId}/etudiant/${this.etudiantId}`)
       .subscribe({
         next: (cours) => {
           const mappedChapitres = this.mapChapitres(Array.isArray(cours.chapitres) ? cours.chapitres : []);
@@ -389,7 +390,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
     }
 
     this.isCleaningUpEmptyCourses = true;
-    return this.http.get<Cours[]>(`http://localhost:8080/cours/etudiant/${this.etudiantId}`).pipe(
+    return this.http.get<Cours[]>(`${API_ENDPOINTS.springApiBaseUrl}/cours/etudiant/${this.etudiantId}`).pipe(
       map((coursesResponse) => Array.isArray(coursesResponse) ? coursesResponse : []),
       map((courses) =>
         courses
@@ -422,7 +423,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
 
     return forkJoin(
       validIds.map((courseId) =>
-        this.http.delete<void>(`http://localhost:8080/cours/delete/${courseId}`).pipe(
+        this.http.delete<void>(`${API_ENDPOINTS.springApiBaseUrl}/cours/delete/${courseId}`).pipe(
           catchError((error) => {
             console.warn('Suppression auto du cours vide echouee:', courseId, error);
             return of(void 0);

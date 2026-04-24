@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, finalize, map, Observable, of, tap } from 'rxjs';
+import { API_ENDPOINTS } from '../config/api.config';
 
 interface LoginResponse {
   accessToken: string;
@@ -15,7 +16,7 @@ interface LoginResponse {
 })
 export class AuthService {
 
-  private readonly apiBaseUrl = 'http://localhost:8080/auth';
+  private readonly apiBaseUrl = `${API_ENDPOINTS.springApiBaseUrl}/auth`;
   private readonly tokenKey = 'openstudy.accessToken';
   private readonly userIdKey = 'openstudy.etudiantId';
 

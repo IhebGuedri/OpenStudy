@@ -10,6 +10,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subject, catchError, finalize, of, takeUntil, timeout, firstValueFrom } from 'rxjs';
 import { marked } from 'marked';
 import jsPDF from 'jspdf';
+import { API_ENDPOINTS } from '../../config/api.config';
 
 @Component({
   selector: 'app-public-course-detail',
@@ -29,7 +30,7 @@ export class PublicCourseDetailComponent implements OnInit, OnDestroy {
   isTogglingStar = false;
   isDownloadingPdf = false;
   chapterComposers: Record<string, any> = {};
-  private readonly aiAgentBaseUrl = 'http://127.0.0.1:8000';
+  private readonly aiAgentBaseUrl = API_ENDPOINTS.aiAgentBaseUrl;
   private etudiantId: number | null = null;
   private loadingFallbackTimer: ReturnType<typeof setTimeout> | null = null;
   private destroy$ = new Subject<void>();

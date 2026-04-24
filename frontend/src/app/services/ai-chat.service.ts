@@ -5,6 +5,7 @@ import { tap, catchError, map } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { NotificationService } from './notification.service';
 import { Cours } from '../chat/chat.models';
+import { API_ENDPOINTS } from '../config/api.config';
 
 export interface AIMessage {
   id: string;
@@ -54,7 +55,7 @@ export interface CourseSummaryResponse {
   providedIn: 'root'
 })
 export class AIChatService {
-  private AI_AGENT_BASE_URL = 'http://127.0.0.1:8000/api';
+  private AI_AGENT_BASE_URL = `${API_ENDPOINTS.aiAgentBaseUrl}/api`;
   private sessionId = this.generateSessionId();
   private messages$ = new BehaviorSubject<AIMessage[]>([]);
   private isLoading$ = new BehaviorSubject<boolean>(false);

@@ -17,6 +17,7 @@ import { NotificationService } from '../../services/notification.service';
 import { AuthService } from '../../services/auth.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import jsPDF from 'jspdf';
+import { API_ENDPOINTS } from '../../config/api.config';
 
 type SectionType = SectionContenuSummary['type'];
 
@@ -122,7 +123,7 @@ export class ChatAreaComponent implements OnChanges {
 
   private readonly composerByCourse = new Map<number, Record<number, ChapterComposerState>>();
   private readonly planByCourse = new Map<number, CoursePlanState>();
-  private readonly aiAgentBaseUrl = 'http://127.0.0.1:8000';
+  private readonly aiAgentBaseUrl = API_ENDPOINTS.aiAgentBaseUrl;
   private readonly planStorageKey = 'openstudy.coursePlans';
   private youtubeEmbedUrl: SafeResourceUrl | null = null;
 
@@ -323,7 +324,7 @@ export class ChatAreaComponent implements OnChanges {
     }
 
     editor.isSaving = true;
-    this.http.put<SavedSectionResponse>(`http://localhost:8080/sections/update/${sectionId}`, {
+    this.http.put<SavedSectionResponse>(`${API_ENDPOINTS.springApiBaseUrl}/sections/update/${sectionId}`, {
       contenu: newContent,
       type: editor.draftType,
       promptSource: section.promptSource ?? 'manual-edit',
@@ -634,13 +635,13 @@ export class ChatAreaComponent implements OnChanges {
       this.currentPlanState.youtubeVideoTitle = '';
       this.youtubeEmbedUrl = null;
 
-      await firstValueFrom(this.http.put(`http://localhost:8080/cours/update/${this.activeCoursId}`, { titre: title }));
+      await firstValueFrom(this.http.put(`${API_ENDPOINTS.springApiBaseUrl}/cours/update/${this.activeCoursId}`, { titre: title }));
       this.courseTitleUpdated.emit({ courseId: this.activeCoursId, title });
 
       const createdChapters: ChapitreSummary[] = [];
       for (let index = 0; index < planItems.length; index += 1) {
         const created = await firstValueFrom(
-          this.http.post<CreatedChapterResponse>(`http://localhost:8080/chapitres/add/${this.activeCoursId}`, {
+          this.http.post<CreatedChapterResponse>(`${API_ENDPOINTS.springApiBaseUrl}/chapitres/add/${this.activeCoursId}`, {
             titre: planItems[index],
             ordre: index + 1,
           })
@@ -733,7 +734,7 @@ export class ChatAreaComponent implements OnChanges {
       }
 
       const savedSection = await firstValueFrom(
-        this.http.post<SavedSectionResponse>(`http://localhost:8080/sections/add/${chapter.id}`, {
+        this.http.post<SavedSectionResponse>(`${API_ENDPOINTS.springApiBaseUrl}/sections/add/${chapter.id}`, {
           contenu: result.content,
           type: 'TEXTE_GENERE',
           promptSource: result.prompt_source ?? 'agent-generated',
@@ -908,7 +909,7 @@ export class ChatAreaComponent implements OnChanges {
 
       const sectionContent = `## Video recommandee\n\n[${this.currentPlanState.youtubeVideoTitle || 'Voir la video YouTube'}](${videoUrl})`;
       const savedSection = await firstValueFrom(
-        this.http.post<SavedSectionResponse>(`http://localhost:8080/sections/add/${lastChapter.id}`, {
+        this.http.post<SavedSectionResponse>(`${API_ENDPOINTS.springApiBaseUrl}/sections/add/${lastChapter.id}`, {
           contenu: sectionContent,
           type: 'TEXTE_GENERE',
           promptSource: 'agent-video-recommendation',
@@ -1040,7 +1041,7 @@ export class ChatAreaComponent implements OnChanges {
       return;
     }
 
-    this.http.post<SavedSectionResponse>(`http://localhost:8080/sections/add/${chapitreId}`, {
+    this.http.post<SavedSectionResponse>(`${API_ENDPOINTS.springApiBaseUrl}/sections/add/${chapitreId}`, {
       contenu,
       type,
       promptSource,
@@ -1222,7 +1223,7 @@ export class ChatAreaComponent implements OnChanges {
   loadCourseVisibility(): void {
     if (!this.activeCoursId) return;
 
-    this.http.get<any>(`http://localhost:8080/cours/${this.activeCoursId}`)
+    this.http.get<any>(`${API_ENDPOINTS.springApiBaseUrl}/cours/${this.activeCoursId}`)
       .subscribe({
         next: (course) => {
           this.courseVisibility = (course.visibilite as any)?.toUpperCase() === 'PUBLIC' ? 'PUBLIC' : 'PRIVE';
@@ -1242,7 +1243,7 @@ export class ChatAreaComponent implements OnChanges {
     }
 
     this.http.get<{ coursId: number; starredByMe: boolean; starsCount: number }>(
-      `http://localhost:8080/cours/${this.activeCoursId}/stars/etudiant/${this.currentUserId}`
+      `${API_ENDPOINTS.springApiBaseUrl}/cours/${this.activeCoursId}/stars/etudiant/${this.currentUserId}`
     ).subscribe({
       next: (status) => {
         this.starredByMe = !!status?.starredByMe;
@@ -1263,7 +1264,7 @@ export class ChatAreaComponent implements OnChanges {
     }
 
     this.isTogglingStar = true;
-    const endpoint = `http://localhost:8080/cours/${this.activeCoursId}/stars/etudiant/${this.currentUserId}`;
+    const endpoint = `${API_ENDPOINTS.springApiBaseUrl}/cours/${this.activeCoursId}/stars/etudiant/${this.currentUserId}`;
     const request$ = this.starredByMe
       ? this.http.delete<{ starredByMe: boolean; starsCount: number }>(endpoint)
       : this.http.put<{ starredByMe: boolean; starsCount: number }>(endpoint, {});
@@ -1385,7 +1386,7 @@ export class ChatAreaComponent implements OnChanges {
     
     if (this.courseVisibility === 'PRIVE') {
       // Make it public
-      this.http.put<any>(`http://localhost:8080/cours/openPublic/${this.activeCoursId}`, {})
+      this.http.put<any>(`${API_ENDPOINTS.springApiBaseUrl}/cours/openPublic/${this.activeCoursId}`, {})
         .subscribe({
           next: (updatedCourse) => {
             this.courseVisibility = 'PUBLIC';
@@ -1400,7 +1401,7 @@ export class ChatAreaComponent implements OnChanges {
         });
     } else {
       // Make it private
-      this.http.put<any>(`http://localhost:8080/cours/update/${this.activeCoursId}`, { visibilite: 'PRIVE' })
+      this.http.put<any>(`${API_ENDPOINTS.springApiBaseUrl}/cours/update/${this.activeCoursId}`, { visibilite: 'PRIVE' })
         .subscribe({
           next: (updatedCourse) => {
             this.courseVisibility = 'PRIVE';

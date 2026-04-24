@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { API_ENDPOINTS } from '../config/api.config';
 
 export interface ResumeDto {
   id: number;
@@ -20,7 +21,7 @@ export interface ResumeUpsertRequest {
   providedIn: 'root'
 })
 export class ResumeService {
-  private apiUrl = 'http://localhost:8080/resumes';
+  private apiUrl = `${API_ENDPOINTS.springApiBaseUrl}/resumes`;
 
   constructor(private http: HttpClient) {}
 
