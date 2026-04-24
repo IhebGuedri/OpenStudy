@@ -35,7 +35,7 @@ services:
     image: ${DOCKER_HUB_USERNAME}/openstudy-fastapi:latest
     restart: always
     ports:
-    - '8080:8080'
+    - '8000:8000'
     environment:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
