@@ -18,7 +18,10 @@ services:
     restart: always
     depends_on:
       - postgres
+    ports:
+      - '8080:8080'
     environment:
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -31,6 +34,8 @@ services:
   fastapi:
     image: ${DOCKER_HUB_USERNAME}/openstudy-fastapi:latest
     restart: always
+    ports:
+    - '8080:8080'
     environment:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
@@ -41,7 +46,7 @@ services:
     image: ${DOCKER_HUB_USERNAME}/openstudy-angular:latest
     restart: always
     ports:
-      - '80:80'
+    - '4200:80' 
     depends_on:
       - backend
       - fastapi
